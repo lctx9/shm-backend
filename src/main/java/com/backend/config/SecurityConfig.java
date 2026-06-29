@@ -19,8 +19,9 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> auth
-                        // ĐỒNG BỘ PUBLIC ZONE: Tất cả API bắt đầu bằng /api/public/ đều được truy cập tự do
                         .requestMatchers("/api/public/**").permitAll()
+                        // ĐỒNG BỘ PUBLIC ZONE: Tất cả API bắt đầu bằng /api/public/ đều được truy cập tự do
+                  
 
                         // PRIVATE ZONE: Tất cả các request còn lại bắt buộc phải xác thực (đăng nhập)
                         .anyRequest().authenticated()

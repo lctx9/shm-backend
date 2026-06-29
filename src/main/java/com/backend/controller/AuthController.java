@@ -2,18 +2,27 @@ package com.backend.controller;
 
 import com.backend.dto.AuthResponse;
 import com.backend.dto.LoginRequest;
+import com.backend.entity.VerificationCode;
+import com.backend.repository.VerificationCodeRepository;
 import com.backend.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+
 @RestController
-@RequestMapping("/api/public/auth") // Đồng bộ hóa đưa vào cụm public chung
-@CrossOrigin(origins = "*")
+@RequestMapping("/api/public/auth")
+@CrossOrigin(origins = "*") // Bật để tránh lỗi CORS khi test với Frontend
+
 public class AuthController {
 
     @Autowired
     private AuthService authService;
+    @Autowired
+    private org.springframework.mail.javamail.JavaMailSender mailSender;
+    @Autowired
+    private VerificationCodeRepository codeRepository;
 
     // URL mới: POST /api/public/auth/login
     @PostMapping("/login")
@@ -35,4 +44,7 @@ public class AuthController {
         String message = authService.logout(token);
         return ResponseEntity.ok(message);
     }
+
+
+
 }

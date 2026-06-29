@@ -48,8 +48,6 @@ public class AuthService {
 
 
     public String logout(String token) {
-        // Với JWT Stateless, chủ yếu Frontend tự xóa token ở LocalStorage là xong.
-        // Backend trả về message xác nhận thành công.
         return "Đăng xuất thành công!";
     }
 }

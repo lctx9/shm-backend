@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
+    boolean existsByEmail(String email);
 
     // THÊM HÀM NÀY: Tìm kiếm user theo Tên hoặc Email, bỏ qua hoa thường
     List<User> findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(String fullName, String email);
