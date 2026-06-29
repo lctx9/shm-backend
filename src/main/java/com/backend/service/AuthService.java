@@ -4,8 +4,10 @@ import com.backend.dto.AuthResponse;
 import com.backend.dto.LoginRequest;
 import com.backend.entity.Role;
 import com.backend.entity.User;
+import com.backend.entity.enums.UserStatus; // Import Enum
 import com.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder; // Quan trọng
 import org.springframework.stereotype.Service;
 import java.util.stream.Collectors;
 
@@ -15,37 +17,36 @@ public class AuthService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder; // Inject Encoder để check pass
+
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại!"));
 
-        // Kiểm tra mật khẩu (đang so sánh chuỗi thô để bạn dễ demo)
-        if (!user.getPassword().equals(request.getPassword())) {
+        // 1. Kiểm tra mật khẩu (Sử dụng matches thay vì equals)
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Mật khẩu không chính xác!");
         }
 
-        // Kiểm tra xem Ban tổ chức đã kích hoạt tài khoản chưa (theo nghiệp vụ SEAL)
-        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            throw new RuntimeException("Tài khoản chưa được kích hoạt hoặc đã bị khóa!");
+        // 2. Kiểm tra trạng thái bằng Enum (UserStatus)
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new RuntimeException("Tài khoản chưa được kích hoạt hoặc đang chờ duyệt!");
         }
 
-        // Tạo chuỗi token giả lập để Frontend lưu lại
+        // 3. Xử lý logic Token & Role (Giữ nguyên logic của bạn)
         String mockToken = "SEAL-MOCK-JWT-" + user.getEmail() + "-" + System.currentTimeMillis();
 
-        // 1. Duyệt qua Set<Role>, lấy ra trường 'name' của từng Role rồi nối lại thành chuỗi, cách nhau bằng dấu phẩy
         String rolesString = user.getRoles().stream()
                 .map(Role::getName)
                 .collect(Collectors.joining(","));
 
-        // 2. Nếu user không có role nào trong DB thì gán mặc định là "USER" để tránh bị rỗng
         if (rolesString.isEmpty()) {
             rolesString = "USER";
         }
 
-        // 3. Trả về AuthResponse với chuỗi role đã được xử lý chuẩn
         return new AuthResponse(mockToken, user.getEmail(), rolesString, "Đăng nhập thành công!");
     }
-
 
     public String logout(String token) {
         return "Đăng xuất thành công!";
