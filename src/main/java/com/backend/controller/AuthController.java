@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/public/auth")
 @CrossOrigin(origins = "*") // Bật để tránh lỗi CORS khi test với Frontend
+
 public class AuthController {
 
     @Autowired
@@ -23,17 +24,18 @@ public class AuthController {
     @Autowired
     private VerificationCodeRepository codeRepository;
 
+    // URL mới: POST /api/public/auth/login
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
             AuthResponse response = authService.login(request);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            // Trả về lỗi 400 và thông báo lỗi cụ thể (sai pass, chưa kích hoạt...)
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
+    // URL mới: POST /api/public/auth/logout
     @PostMapping("/logout")
     public ResponseEntity<String> logout(@RequestHeader(value = "Authorization", required = false) String token) {
         if (token != null && token.startsWith("Bearer ")) {
