@@ -1,15 +1,13 @@
 package com.backend.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
 public class AuthResponse {
     private String token;
+    private String email;
+    private String role;
     private String message;
-
-
-    public AuthResponse(String token, String message) {
-        this.token = token;
-        this.message = message;
-    }
-
-    public String getToken() { return token; }
-    public String getMessage() { return message; }
 }
