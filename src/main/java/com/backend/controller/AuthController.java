@@ -8,24 +8,25 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth")
-@CrossOrigin(origins = "*") // Bật để tránh lỗi CORS khi test với Frontend
+@RequestMapping("/api/public/auth") // Đồng bộ hóa đưa vào cụm public chung
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
     private AuthService authService;
 
+    // URL mới: POST /api/public/auth/login
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
             AuthResponse response = authService.login(request);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            // Trả về lỗi 400 và thông báo lỗi cụ thể (sai pass, chưa kích hoạt...)
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
+    // URL mới: POST /api/public/auth/logout
     @PostMapping("/logout")
     public ResponseEntity<String> logout(@RequestHeader(value = "Authorization", required = false) String token) {
         if (token != null && token.startsWith("Bearer ")) {
