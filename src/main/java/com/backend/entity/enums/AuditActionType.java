@@ -1,0 +1,3 @@
+package com.backend.entity.enums;
+
+public enum AuditActionType { SCORE_SUBMITTED, SCORE_UPDATED, TEAM_DISQUALIFIED, SUBMISSION_DISQUALIFIED, ROUND_ADVANCED }
