@@ -17,7 +17,7 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Email không tồn tại!"));
+                .orElseThrow(() -> new RuntimeException("Email không tồn tại123!"));
 
         // Kiểm tra mật khẩu (đang so sánh chuỗi thô để bạn dễ demo)
         if (!user.getPassword().equals(request.getPassword())) {
