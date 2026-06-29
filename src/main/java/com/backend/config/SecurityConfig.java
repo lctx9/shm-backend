@@ -13,7 +13,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable()) // Tắt CSRF vì mình làm REST API dùng JWT
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll() // Cho phép truy cập link login công khai
+                        .requestMatchers("/api/public/**").permitAll()
                         .anyRequest().authenticated()
                 );
         return http.build();
