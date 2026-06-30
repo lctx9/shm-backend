@@ -1,10 +1,13 @@
 package com.backend.service;
 
+import com.backend.dto.AccountApprovalRequest;
 import com.backend.dto.UserResponse;
 import com.backend.entity.User;
+import com.backend.entity.enums.UserStatus;
 import com.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,6 +26,34 @@ public class UserService {
         return users.stream()
                 .map(this::mapToUserResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Phê duyệt hoặc từ chối tài khoản dành cho Coordinator
+     */
+    @Transactional
+    public UserResponse approveOrRejectAccount(AccountApprovalRequest request) {
+        // 1. Tìm user theo UUID từ request
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với ID: " + request.getUserId()));
+
+        // 2. Ràng buộc: Chỉ xử lý các tài khoản đang ở trạng thái PENDING
+        if (user.getStatus() != UserStatus.PENDING) {
+            throw new IllegalStateException("Tài khoản này đã được xử lý từ trước, trạng thái hiện tại: " + user.getStatus());
+        }
+
+        // 3. Kiểm tra trạng thái hợp lệ (Chỉ nhận ACTIVE hoặc INACTIVE)
+        if (request.getStatus() == UserStatus.ACTIVE || request.getStatus() == UserStatus.INACTIVE) {
+            user.setStatus(request.getStatus());
+        } else {
+            throw new IllegalArgumentException("Trạng thái phê duyệt không hợp lệ! Chỉ chấp nhận ACTIVE hoặc INACTIVE.");
+        }
+
+        // 4. Lưu lại sự thay đổi xuống database
+        User updatedUser = userRepository.save(user);
+
+        // 5. Trả về format UserResponse thông qua hàm map có sẵn của bạn
+        return this.mapToUserResponse(updatedUser);
     }
 
     private UserResponse mapToUserResponse(User user) {
