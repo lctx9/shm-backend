@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface RoleRepository extends JpaRepository<Role, Long> {
-    // Thay đổi tham số từ String thành RoleName
+    // Chỉ thay đổi kiểu tham số String thành Enum RoleName để đồng bộ hóa
     Optional<Role> findByName(RoleName name);
 }
