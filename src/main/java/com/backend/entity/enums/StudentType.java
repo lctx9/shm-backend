@@ -1,3 +1,5 @@
 package com.backend.entity.enums;
 
-public enum StudentType { FPT, EXTERNAL }
+public enum StudentType {FPT, EXTERNAL}
+
+
