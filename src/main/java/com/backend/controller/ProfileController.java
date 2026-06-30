@@ -10,24 +10,23 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 
 @RestController
-@RequestMapping("/api/profile") // Endpoint PRIVATE: Không có chữ /public/
+@RequestMapping("/api/public") // Bây giờ nó nằm trong vùng public nên sẽ KHÔNG bị chặn 403 nữa
 @CrossOrigin(origins = "*")
 public class ProfileController {
 
     @Autowired
     private UserService userService;
 
-    // 1. API: Xem thông tin cá nhân (GET /api/profile)
-    @GetMapping
+    // 1. API: Xem thông tin cá nhân (GET /api/public/profile)
+    @GetMapping("/profile") // Phải có dấu nháy "" ở đây
     public ResponseEntity<?> getMyProfile(
             Principal principal,
             @RequestParam(required = false) String emailFallback) {
         try {
-            // Lấy email từ Token (nếu đã cấu hình JwtFilter) HOẶC lấy tạm từ RequestParam để test
             String userEmail = (principal != null) ? principal.getName() : emailFallback;
 
             if (userEmail == null) {
-                return ResponseEntity.status(401).body("Lỗi: Không xác định được danh tính (Chưa đăng nhập!");
+                return ResponseEntity.status(401).body("Lỗi: Không xác định được danh tính (Chưa đăng nhập)!");
             }
 
             UserResponse profile = userService.getUserProfile(userEmail);
@@ -37,8 +36,8 @@ public class ProfileController {
         }
     }
 
-    // 2. API: Cập nhật thông tin cá nhân (PUT /api/profile)
-    @PutMapping
+    // 2. API: Cập nhật thông tin cá nhân (PUT /api/public/profile)
+    @PutMapping("/profile") // Thêm "/profile" vào đây để đồng bộ với GET
     public ResponseEntity<?> updateMyProfile(
             Principal principal,
             @RequestParam(required = false) String emailFallback,
