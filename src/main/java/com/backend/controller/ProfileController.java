@@ -27,7 +27,7 @@ public class ProfileController {
             String userEmail = (principal != null) ? principal.getName() : emailFallback;
 
             if (userEmail == null) {
-                return ResponseEntity.status(401).body("Lỗi: Không xác định được danh tính (Chưa đăng nhập)!");
+                return ResponseEntity.status(401).body("Lỗi: Không xác định được danh tính (Chưa đăng nhập!");
             }
 
             UserResponse profile = userService.getUserProfile(userEmail);
