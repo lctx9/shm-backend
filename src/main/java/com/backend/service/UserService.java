@@ -29,7 +29,7 @@ public class UserService {
     }
 
     /**
-     * Phê duyệt hoặc từ chối tài khoản dành cho Coordinator
+     * Phê duyệt hoặc từ chối tài khoản dành cho Coordinator (Có kèm lý do từ chối)
      */
     @Transactional
     public UserResponse approveOrRejectAccount(AccountApprovalRequest request) {
@@ -42,9 +42,19 @@ public class UserService {
             throw new IllegalStateException("Tài khoản này đã được xử lý từ trước, trạng thái hiện tại: " + user.getStatus());
         }
 
-        // 3. Kiểm tra trạng thái hợp lệ (Chỉ nhận ACTIVE hoặc INACTIVE)
-        if (request.getStatus() == UserStatus.ACTIVE || request.getStatus() == UserStatus.INACTIVE) {
-            user.setStatus(request.getStatus());
+        // 3. Kiểm tra trạng thái hợp lệ và xử lý lý do (reason)
+        if (request.getStatus() == UserStatus.ACTIVE) {
+            user.setStatus(UserStatus.ACTIVE);
+        } else if (request.getStatus() == UserStatus.INACTIVE) {
+            // Ràng buộc bổ sung: Nếu từ chối (INACTIVE) thì bắt buộc phải nhập lý do
+            if (request.getReason() == null || request.getReason().trim().isEmpty()) {
+                throw new IllegalArgumentException("Vui lòng cung cấp lý do từ chối phê duyệt tài khoản này!");
+            }
+            user.setStatus(UserStatus.INACTIVE);
+
+            // LƯU Ý: Nếu sau này nhóm bạn thêm trường lưu lý do vào User Entity (ví dụ: user.setRejectReason(...))
+            // bạn hãy mở ghi chú dòng dưới đây để lưu vào DB nhé:
+            // user.setRejectReason(request.getReason());
         } else {
             throw new IllegalArgumentException("Trạng thái phê duyệt không hợp lệ! Chỉ chấp nhận ACTIVE hoặc INACTIVE.");
         }
