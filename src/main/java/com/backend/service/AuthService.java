@@ -19,17 +19,14 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("Email không tồn tại!"));
 
-        // Kiểm tra mật khẩu (đang so sánh chuỗi thô để bạn dễ demo)
         if (!user.getPassword().equals(request.getPassword())) {
             throw new RuntimeException("Mật khẩu không chính xác!");
         }
 
-        // Kiểm tra xem Ban tổ chức đã kích hoạt tài khoản chưa (theo nghiệp vụ SEAL)
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
             throw new RuntimeException("Tài khoản chưa được kích hoạt hoặc đã bị khóa!");
         }
 
-        // Tạo chuỗi token giả lập để Frontend lưu lại
         String mockToken = "SEAL-MOCK-JWT-" + user.getEmail() + "-" + System.currentTimeMillis();
 
         // 1. Duyệt qua Set<Role>, lấy ra trường 'name' của từng Role rồi nối lại thành chuỗi, cách nhau bằng dấu phẩy

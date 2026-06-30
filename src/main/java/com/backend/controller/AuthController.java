@@ -19,9 +19,7 @@ public class AuthController {
 
     @Autowired
     private AuthService authService;
-    @Autowired
     private org.springframework.mail.javamail.JavaMailSender mailSender;
-    @Autowired
     private VerificationCodeRepository codeRepository;
 
     // URL mới: POST /api/public/auth/login

@@ -20,6 +20,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/public/**").permitAll()
+
                         // ĐỒNG BỘ PUBLIC ZONE: Tất cả API bắt đầu bằng /api/public/ đều được truy cập tự do
                   
 
