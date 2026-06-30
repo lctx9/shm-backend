@@ -4,19 +4,23 @@ import com.backend.dto.RegisterRequest;
 import com.backend.entity.User;
 import com.backend.entity.Role;
 import com.backend.entity.VerificationCode;
+import com.backend.entity.enums.RoleName;
+import com.backend.entity.enums.StudentType;
+import com.backend.entity.enums.UserStatus;
 import com.backend.repository.UserRepository;
 import com.backend.repository.RoleRepository;
 import com.backend.repository.VerificationCodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile; // <-- Nhớ import thư viện này
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 
 @RestController
-@RequestMapping("/api/public/auth") // Giữ đúng Prefix hệ thống cũ của bạn
+@RequestMapping("/api/public/auth")
 @CrossOrigin(origins = "*")
 public class RegisterController {
 
@@ -32,15 +36,18 @@ public class RegisterController {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder; // Tiêm bộ mã hóa mật khẩu
+
     @PostMapping("/send-otp")
     public ResponseEntity<?> sendOtp(@RequestParam String email) {
         String otp = String.format("%06d", new java.util.Random().nextInt(999999));
 
-        VerificationCode verificationCode = new VerificationCode();
-        verificationCode.setEmail(email);
-        verificationCode.setCode(otp);
-        verificationCode.setExpiryTime(LocalDateTime.now().plusMinutes(5));
-        codeRepository.save(verificationCode);
+        VerificationCode code = new VerificationCode();
+        code.setEmail(email);
+        code.setCode(otp);
+        code.setExpiryTime(LocalDateTime.now().plusMinutes(5));
+        codeRepository.save(code);
 
         try {
             org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
@@ -54,17 +61,16 @@ public class RegisterController {
         }
     }
 
-    // API 2: XỬ LÝ ĐĂNG KÝ TÀI KHOẢN CHÍNH THỨC (Đã nâng cấpMultipart)
-    @PostMapping(value = "/register", consumes = {"multipart/form-data"}) // <-- Bắt buộc chỉ định loại dữ liệu nhận
+    @PostMapping(value = "/register", consumes = {"multipart/form-data"})
     public ResponseEntity<?> register(
-            @ModelAttribute RegisterRequest request, // <-- Đổi từ @RequestBody sang @ModelAttribute
-            @RequestParam("studentCard") MultipartFile studentCardFile // <-- Thêm trường hứng file ảnh từ FE gửi lên
+            @ModelAttribute RegisterRequest request,
+            @RequestParam("studentCard") MultipartFile studentCardFile
     ) {
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest().body("Email này đã được đăng ký trên hệ thống!");
         }
 
-        // Kiểm tra logic OTP
+        // Kiểm tra logic OTP công tâm từ Database
         VerificationCode activeCode = codeRepository.findFirstByEmailOrderByIdDesc(request.getEmail())
                 .orElse(null);
 
@@ -80,45 +86,42 @@ public class RegisterController {
             return ResponseEntity.badRequest().body("Mã OTP đã hết hạn sử dụng. Vui lòng bấm gửi lại mã mới!");
         }
 
-        // KIỂM TRA FILE ẢNH THẺ SINH VIÊN
+        // Kiểm tra file ảnh thẻ sinh viên gửi từ FE lên
         if (studentCardFile == null || studentCardFile.isEmpty()) {
             return ResponseEntity.badRequest().body("Vui lòng tải lên hình ảnh thẻ sinh viên để BTC xác thực!");
         }
 
+        // Tạo Entity User và băm mật khẩu bằng PasswordEncoder
         User user = new User();
         user.setEmail(request.getEmail());
-        user.setPassword(request.getPassword()); // NOTE: Nên bọc BCryptPasswordEncoder ở đây sau này
+        user.setPassword(passwordEncoder.encode(request.getPassword())); // Mã hóa chuẩn BCrypt chống lỗi đăng nhập
         user.setFullName(request.getFullName());
         user.setStudentId(request.getStudentId());
 
-        // Phân tách trạng thái duyệt theo loại sinh viên
+        // Xử lý Enum chuẩn xác
         if ("true".equals(request.getIsFptStudent())) {
-            user.setStudentType("FPT");
+            user.setStudentType(StudentType.FPT);
             user.setUniversityName("FPT University");
-            user.setStatus("ACTIVE");
+            user.setStatus(UserStatus.ACTIVE);
         } else {
-            user.setStudentType("EXTERNAL");
+            user.setStudentType(StudentType.EXTERNAL);
             user.setUniversityName(request.getUniversityName());
-            user.setStatus("PENDING"); // Chờ Coordinator duyệt ảnh thẻ
+            user.setStatus(UserStatus.PENDING);
         }
 
-        // Xử lý lưu File Ảnh Thẻ Sinh Viên
+        // Xử lý file ảnh (Log ra console kiểm tra tạm thời)
         try {
-            // NOTE: Tạm thời bạn có thể lấy tên file lưu vào một cột tên là `studentCardImage` trong bảng User để test
-            // String fileName = studentCardFile.getOriginalFilename();
-            // user.setStudentCardImage(fileName);
-
             System.out.println(">>> Đã nhận file ảnh thẻ thành công: " + studentCardFile.getOriginalFilename());
-            System.out.println(">>> Dung lượng file: " + studentCardFile.getSize() + " bytes");
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Lỗi xử lý file hình ảnh: " + e.getMessage());
         }
 
-        Role studentRole = roleRepository.findById(5)
-                .orElseThrow(() -> new RuntimeException("Lỗi: Không tìm thấy định nghĩa quyền STUDENT (ID=5) trong DB!"));
+        // Tìm Role bằng Name truyền vào Enum chuẩn xác
+        Role studentRole = roleRepository.findByName(RoleName.STUDENT)
+                .orElseThrow(() -> new RuntimeException("Quyền STUDENT chưa được thiết lập trong DB!"));
         user.getRoles().add(studentRole);
 
         userRepository.save(user);
-        return ResponseEntity.ok("Tạo tài khoản thành công! Trạng thái: " + user.getStatus());
+        return ResponseEntity.ok("Tạo tài khoản thành công! Trạng thái hiện tại: " + user.getStatus());
     }
 }
