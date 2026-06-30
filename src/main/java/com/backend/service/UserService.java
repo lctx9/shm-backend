@@ -16,24 +16,33 @@ public class UserService {
     private UserRepository userRepository;
 
     public List<UserResponse> searchUsers(String keyword) {
-        // Gọi repo tìm kiếm song song cả tên và email theo keyword
+        // Tìm kiếm theo keyword (fullName hoặc email)
         List<User> users = userRepository.findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(keyword, keyword);
 
-        // Chuyển đổi từ List<User> sang List<UserResponse> để bảo mật thông tin (ẩn password)
-        return users.stream().map(this::mapToUserResponse).collect(Collectors.toList());
+        // Chuyển đổi Entity sang DTO
+        return users.stream()
+                .map(this::mapToUserResponse)
+                .collect(Collectors.toList());
     }
 
-    // Helper method để map data từ Entity sang DTO
     private UserResponse mapToUserResponse(User user) {
         UserResponse response = new UserResponse();
         response.setId(user.getId());
         response.setEmail(user.getEmail());
         response.setFullName(user.getFullName());
         response.setStatus(user.getStatus());
+
+        // Thông tin sinh viên
         response.setStudentId(user.getStudentId());
         response.setUniversityName(user.getUniversityName());
-        response.setAvatarUrl(user.getAvatarUrl());
+
+        // Lưu ý: User Entity hiện tại của bạn không có avatarUrl
+        // Nếu bạn muốn thêm, hãy bổ sung vào class User Entity trước nhé
+        // response.setAvatarUrl(user.getAvatarUrl());
+
+        // Map roles: Tùy vào DTO của bạn yêu cầu trả về Set<Role> hay List<String>
         response.setRoles(user.getRoles());
+
         return response;
     }
 }
