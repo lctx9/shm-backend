@@ -25,7 +25,7 @@ public class RankingController {
     public ResponseEntity<?> executeRanking(@RequestParam UUID roundId) {
         try {
             List<TeamRoundRanking> results = rankingService.calculateAndExecuteRanking(roundId);
-            return ResponseEntity.ok("Tính toán tổng điểm có trọng số và xét thăng vòng thành cônggg!");
+            return ResponseEntity.ok("Tính toán tổng điểm có trọng số và xét thăng vòng thành côngggggggg!");
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
