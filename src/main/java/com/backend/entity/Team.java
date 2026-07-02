@@ -28,7 +28,7 @@ public class Team extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
-    private TeamStatus status = TeamStatus.PENDING;
+    private TeamStatus status = TeamStatus.APPROVED;
 
     @Column(name = "disqualification_reason", columnDefinition = "TEXT")
     private String disqualificationReason;
@@ -40,4 +40,12 @@ public class Team extends BaseEntity {
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Submission> submissions = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false, length = 20)
+    @Builder.Default
+    private com.backend.entity.enums.TeamVisibility visibility = com.backend.entity.enums.TeamVisibility.PUBLIC;
+
+    @Column(name = "pin_code", length = 4)
+    private String pinCode;
 }
