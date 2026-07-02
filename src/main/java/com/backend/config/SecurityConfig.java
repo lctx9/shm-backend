@@ -29,9 +29,4 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // CHỈ THÊM DUY NHẤT ĐOẠN NÀY: Khai báo Bean để AuthService và RegisterController gọi được
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 }
