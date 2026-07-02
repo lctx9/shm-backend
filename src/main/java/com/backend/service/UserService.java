@@ -68,7 +68,7 @@ public class UserService {
         // Thông tin sinh viên
         response.setStudentId(user.getStudentId());
         response.setUniversityName(user.getUniversityName());
-
+        response.setRejectReason(user.getRejectReason());
         // Map roles: Giữ nguyên theo DTO cũ của bạn
         response.setRoles(user.getRoles());
 
@@ -85,11 +85,16 @@ public class UserService {
 
         if (request.isApproved()) {
             user.setStatus(com.backend.entity.enums.UserStatus.ACTIVE);
+            user.setRejectReason(null); // Duyệt thành công thì xóa lý do cũ nếu có
         } else {
             user.setStatus(com.backend.entity.enums.UserStatus.INACTIVE);
 
-            // Xử lý lý do từ chối (Gợi ý: bạn có thể truyền reason vào service gửi mail tại đây)
-            String rejectReason = request.getReason() != null ? request.getReason() : "Thông tin không hợp lệ.";
+            // Lấy lý do từ request, nếu trống thì để mặc định
+            String rejectReason = request.getReason() != null && !request.getReason().trim().isEmpty()
+                    ? request.getReason()
+                    : "Thông tin đăng ký không hợp lệ.";
+
+            user.setRejectReason(rejectReason); // <--- LƯU LÝ DO VÀO DATABASE TẠI ĐÂY
             System.out.println("Tài khoản " + user.getEmail() + " bị từ chối với lý do: " + rejectReason);
         }
 
@@ -101,5 +106,7 @@ public class UserService {
                 .map(this::mapToUserResponse) // Tái sử dụng lại hàm mapToUserResponse có sẵn của bạn cực kỳ sạch code
                 .collect(Collectors.toList());
     }
+
+
 
 }
