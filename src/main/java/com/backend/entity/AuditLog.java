@@ -1,43 +1,42 @@
 package com.backend.entity;
 
-import com.backend.entity.enums.AuditActionType;
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.UuidGenerator;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "audit_logs")
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
-@Builder
-public class AuditLog extends BaseEntity {
-
+public class AuditLog {
     @Id
-    @UuidGenerator
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "performed_by", nullable = false)
-    private User performedBy;
+    private UUID actorId;        // Người thực hiện hành động (Judge, Coordinator, Admin)
+    private String actionType;   // "SCORING", "UPDATE_SCORE", "DISQUALIFY_TEAM", "REJECT_SUBMISSION", "ADVANCEMENT"
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "action_type", nullable = false, length = 50)
-    private AuditActionType actionType;
+    private UUID eventId;        // Liên kết lọc theo Event
+    private UUID teamId;         // Liên kết lọc theo Team
+    private UUID submissionId;   // Liên kết lọc theo Submission
 
-    @Column(name = "target_entity", length = 100)
-    private String targetEntity; // VD: "Submission", "Team"
+    @Column(length = 1000)
+    private String description;  // Mô tả chi tiết (ví dụ: "Điểm cũ: 7.0 -> Điểm mới: 8.5", hoặc lý do loại)
+    private LocalDateTime timestamp;
 
-    @Column(name = "target_id", columnDefinition = "uuid")
-    private UUID targetId;
-
-    @Column(name = "reason", columnDefinition = "TEXT")
-    private String reason;
-
-    @Column(name = "old_value", columnDefinition = "TEXT")
-    private String oldValue; // JSON
-
-    @Column(name = "new_value", columnDefinition = "TEXT")
-    private String newValue; // JSON
+    // Getters and Setters
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public UUID getActorId() { return actorId; }
+    public void setActorId(UUID actorId) { this.actorId = actorId; }
+    public String getActionType() { return actionType; }
+    public void setActionType(String actionType) { this.actionType = actionType; }
+    public UUID getEventId() { return eventId; }
+    public void setEventId(UUID eventId) { this.eventId = eventId; }
+    public UUID getTeamId() { return teamId; }
+    public void setTeamId(UUID teamId) { this.teamId = teamId; }
+    public UUID getSubmissionId() { return submissionId; }
+    public void setSubmissionId(UUID submissionId) { this.submissionId = submissionId; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
 }
