@@ -49,6 +49,9 @@ public class User extends BaseEntity {
     @Builder.Default
     private boolean isGuestJudge = false;
 
+    @Column(name = "reject_reason", length = 500)
+    private String rejectReason;
+
     // Roles
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

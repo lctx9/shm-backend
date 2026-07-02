@@ -18,4 +18,5 @@ public class UserResponse {
     private String universityName;
     private String avatarUrl;
     private Set<Role> roles;
+    private String rejectReason;
 }
