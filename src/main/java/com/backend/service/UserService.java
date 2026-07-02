@@ -74,4 +74,31 @@ public class UserService {
 
         return response;
     }
+
+    // ==========================================
+    // CHỨC NĂNG PHÊ DUYỆT TÀI KHOẢN (APPEND MỚI)
+    // ==========================================
+    @org.springframework.transaction.annotation.Transactional
+    public void approveUser(com.backend.dto.ApproveUserRequest request) {
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản người dùng"));
+
+        if (request.isApproved()) {
+            user.setStatus(com.backend.entity.enums.UserStatus.ACTIVE);
+        } else {
+            user.setStatus(com.backend.entity.enums.UserStatus.INACTIVE);
+
+            // Xử lý lý do từ chối (Gợi ý: bạn có thể truyền reason vào service gửi mail tại đây)
+            String rejectReason = request.getReason() != null ? request.getReason() : "Thông tin không hợp lệ.";
+            System.out.println("Tài khoản " + user.getEmail() + " bị từ chối với lý do: " + rejectReason);
+        }
+
+        userRepository.save(user);
+    }
+
+    public List<UserResponse> getPendingUsers() {
+        return userRepository.findByStatus(com.backend.entity.enums.UserStatus.PENDING).stream()
+                .map(this::mapToUserResponse) // Tái sử dụng lại hàm mapToUserResponse có sẵn của bạn cực kỳ sạch code
+                .collect(Collectors.toList());
+    }
 }

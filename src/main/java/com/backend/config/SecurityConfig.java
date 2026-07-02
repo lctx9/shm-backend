@@ -21,7 +21,12 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
 
                 .authorizeHttpRequests(auth -> auth
+                        // 1. VÙNG CÔNG KHAI: Cho phép tất cả mọi người truy cập (Search, Register, Login...)
                         .requestMatchers("/api/public/**").permitAll()
+
+                        // 2. VÙNG BẢO MẬT: Phải đăng nhập (Dành cho Coordinator duyệt bài, xem danh sách chờ)
+                        .requestMatchers("/api/coordinator/**").authenticated()
+
                         // PRIVATE ZONE: Tất cả các request còn lại bắt buộc phải xác thực (đăng nhập)
                         .anyRequest().authenticated()
                 );
@@ -29,7 +34,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // CHỈ THÊM DUY NHẤT ĐOẠN NÀY: Khai báo Bean để AuthService và RegisterController gọi được
+    // Khai báo Bean để AuthService và RegisterController gọi được
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

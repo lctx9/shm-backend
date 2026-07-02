@@ -16,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     // THÊM HÀM NÀY: Tìm kiếm user theo Tên hoặc Email, bỏ qua hoa thường
     List<User> findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCase(String fullName, String email);
+    // Thêm hàm này vào cuối interface UserRepository để tìm danh sách chờ duyệt
+    List<User> findByStatus(com.backend.entity.enums.UserStatus status);
 }
