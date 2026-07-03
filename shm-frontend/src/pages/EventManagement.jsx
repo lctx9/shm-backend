@@ -1,368 +1,317 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axiosClient from '../api/axiosClient';
 
+const createEmptyEvent = () => ({
+    name: '',
+    season: 'SPRING',
+    year: new Date().getFullYear(),
+    regStartDate: '',
+    regEndDate: '',
+    eventStartDate: '',
+    eventEndDate: '',
+    submissionDeadline: '',
+    roundCount: 2,
+    tracks: ['Software Engineering', 'AI Application'],
+});
+
+const toLocalInput = (value) => value ? value.slice(0, 16) : '';
+
 export default function EventManagement() {
+    const [events, setEvents] = useState([]);
+    const [teams, setTeams] = useState([]);
+    const [mentors, setMentors] = useState([]);
+    const [judges, setJudges] = useState([]);
+    const [selectedEventId, setSelectedEventId] = useState('');
+    const [selectedMatrixId, setSelectedMatrixId] = useState('');
+    const [formData, setFormData] = useState(createEmptyEvent);
+    const [matrixForm, setMatrixForm] = useState({ guidelineUrl: '', submissionDeadline: '', mentorIds: [], judgeIds: [] });
+    const [prizeForm, setPrizeForm] = useState({ name: '', description: '', teamId: '' });
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
 
-    // --- State danh sách từ Database ---
-    const [staffList, setStaffList] = useState([]);
+    const selectedEvent = useMemo(
+        () => events.find((event) => String(event.id) === String(selectedEventId)),
+        [events, selectedEventId]
+    );
 
-    // --- State Form Dữ Liệu ---
-    const [formData, setFormData] = useState({
-        name: '',
-        season: 'SPRING',
-        year: 2026,
-        regStartDate: '',
-        regEndDate: '',
-        eventStartDate: '',
-        eventEndDate: '',
-        maxTeams: 30,
-        totalRounds: 2,
-        totalTracks: 2,
+    const selectedMatrix = useMemo(
+        () => selectedEvent?.matrices?.find((matrix) => String(matrix.id) === String(selectedMatrixId)),
+        [selectedEvent, selectedMatrixId]
+    );
 
-        selectedJudges: [],
-        selectedMentors: [],
+    const eventTeams = useMemo(
+        () => teams.filter((team) => String(team.eventId) === String(selectedEventId)),
+        [teams, selectedEventId]
+    );
 
-        // Cấu hình Rubrics
-        rubrics: [
-            { roundNumber: 1, criteria: 'Ý tưởng sáng tạo', weight: 40 },
-            { roundNumber: 1, criteria: 'Tính khả thi & Kỹ thuật', weight: 60 }
-        ],
+    const fetchAll = async () => {
+        const [eventRes, teamRes, mentorRes, judgeRes] = await Promise.all([
+            axiosClient.get('/events'),
+            axiosClient.get('/teams'),
+            axiosClient.get('/users/role/MENTOR').catch(() => ({ result: [] })),
+            axiosClient.get('/users/role/JUDGE').catch(() => ({ result: [] })),
+        ]);
 
-        // Phân công Giám khảo phụ trách theo Vòng (Đã loại bỏ trường Đội thi)
-        judgeAssignments: [
-            { roundNumber: 1, judgeId: '' }
-        ]
-    });
+        const loadedEvents = eventRes.result || [];
+        setEvents(loadedEvents);
+        setTeams(teamRes.result || []);
+        setMentors(mentorRes.result || []);
+        setJudges(judgeRes.result || []);
 
-    // --- Lấy dữ liệu danh sách Staff từ API ---
+        const nextEventId = selectedEventId || loadedEvents[0]?.id || '';
+        setSelectedEventId(nextEventId);
+        const event = loadedEvents.find((item) => String(item.id) === String(nextEventId));
+        setSelectedMatrixId(event?.matrices?.[0]?.id || '');
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // const staffRes = await axiosClient.get('/users/staffs');
-                // setStaffList(staffRes.data);
-
-                setStaffList([
-                    { id: 'st01', fullName: 'Nguyễn Văn A (Staff)', email: 'anv@seal.com' },
-                    { id: 'st02', fullName: 'Trần Thị B (Staff)', email: 'btt@seal.com' },
-                    { id: 'st03', fullName: 'Lê Hoàng C (Staff)', email: 'cleh@seal.com' },
-                    { id: 'st04', fullName: 'Phạm Minh D (Staff)', email: 'dpm@seal.com' },
-                ]);
-            } catch (err) {
-                console.error("Lỗi tải danh sách cấu hình:", err);
-            }
-        };
-        fetchData();
+        fetchAll().catch((err) => setMessage({ text: err.message || 'Không thể tải dữ liệu quản lý giải đấu.', type: 'error' }));
     }, []);
 
-    // Xử lý Checkbox chọn Judge/Mentor
-    const handleCheckboxChange = (id, type) => {
-        const listName = type === 'judge' ? 'selectedJudges' : 'selectedMentors';
-        setFormData(prev => {
-            const currentList = prev[listName];
-            const updatedList = currentList.includes(id)
-                ? currentList.filter(item => item !== id)
-                : [...currentList, id];
-            return { ...prev, [listName]: updatedList };
+    useEffect(() => {
+        if (!selectedMatrix) return;
+        setMatrixForm({
+            guidelineUrl: selectedMatrix.guidelineUrl || '',
+            submissionDeadline: toLocalInput(selectedMatrix.submissionDeadline),
+            mentorIds: selectedMatrix.mentors?.map((user) => user.id) || [],
+            judgeIds: selectedMatrix.judges?.map((user) => user.id) || [],
+        });
+    }, [selectedMatrix]);
+
+    const updateTrack = (index, value) => {
+        setFormData((current) => ({
+            ...current,
+            tracks: current.tracks.map((track, idx) => idx === index ? value : track),
+        }));
+    };
+
+    const toggleId = (field, id) => {
+        setMatrixForm((current) => {
+            const exists = current[field].some((item) => String(item) === String(id));
+            return {
+                ...current,
+                [field]: exists ? current[field].filter((item) => String(item) !== String(id)) : [...current[field], id],
+            };
         });
     };
 
-    const addRubricRow = () => {
-        setFormData({
-            ...formData,
-            rubrics: [...formData.rubrics, { roundNumber: 1, criteria: '', weight: 0 }]
-        });
-    };
-
-    // Quản lý hàng phân công Judge theo vòng mới
-    const addAssignmentRow = () => {
-        setFormData({
-            ...formData,
-            judgeAssignments: [...formData.judgeAssignments, { roundNumber: 1, judgeId: '' }]
-        });
-    };
-
-    const handleSubmit = async (e) => {
+    const handleCreateEvent = async (e) => {
         e.preventDefault();
         setLoading(true);
         setMessage({ text: '', type: '' });
 
-        // Kiểm tra tổng trọng số rubric mỗi vòng phải bằng 100%
-        const weightsByRound = {};
-        formData.rubrics.forEach(r => {
-            weightsByRound[r.roundNumber] = (weightsByRound[r.roundNumber] || 0) + Number(r.weight);
-        });
-
-        const invalidRound = Object.keys(weightsByRound).find(round => weightsByRound[round] !== 100);
-        if (invalidRound) {
-            setMessage({ text: `Tổng trọng số tiêu chí (Rubric) của Vòng ${invalidRound} phải bằng 100%! Hiện tại là ${weightsByRound[invalidRound]}%`, type: 'error' });
+        try {
+            const payload = {
+                ...formData,
+                roundCount: Number(formData.roundCount),
+                tracks: formData.tracks.map((track) => track.trim()).filter(Boolean),
+            };
+            const response = await axiosClient.post('/events', payload);
+            setMessage({ text: 'Tạo event, track, round và matrix thành công.', type: 'success' });
+            setFormData(createEmptyEvent());
+            await fetchAll();
+            setSelectedEventId(response.result?.id || '');
+            setSelectedMatrixId(response.result?.matrices?.[0]?.id || '');
+        } catch (err) {
+            setMessage({ text: err.message || 'Không thể tạo giải đấu.', type: 'error' });
+        } finally {
             setLoading(false);
-            return;
         }
+    };
+
+    const handleSaveMatrix = async (e) => {
+        e.preventDefault();
+        if (!selectedMatrixId) return;
 
         try {
-            await axiosClient.post('/events', formData);
-            setMessage({ text: 'Khởi tạo và phân công giám khảo hoàn tất thành công!', type: 'success' });
+            setLoading(true);
+            await axiosClient.put(`/events/matrices/${selectedMatrixId}`, {
+                guidelineUrl: matrixForm.guidelineUrl,
+                submissionDeadline: matrixForm.submissionDeadline || null,
+                mentorIds: matrixForm.mentorIds.map(Number),
+                judgeIds: matrixForm.judgeIds.map(Number),
+            });
+            setMessage({ text: 'Cập nhật matrix, guideline, deadline và phân công thành công.', type: 'success' });
+            await fetchAll();
         } catch (err) {
-            setMessage({ text: err.message || 'Có lỗi xảy ra khi tạo giải đấu!', type: 'error' });
+            setMessage({ text: err.message || 'Không thể cập nhật matrix.', type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreatePrize = async (e) => {
+        e.preventDefault();
+        if (!selectedEventId) return;
+
+        try {
+            setLoading(true);
+            await axiosClient.post(`/events/${selectedEventId}/prizes`, {
+                name: prizeForm.name,
+                description: prizeForm.description,
+                teamId: prizeForm.teamId ? Number(prizeForm.teamId) : null,
+            });
+            setMessage({ text: 'Lưu cơ cấu/trao giải thành công.', type: 'success' });
+            setPrizeForm({ name: '', description: '', teamId: '' });
+        } catch (err) {
+            setMessage({ text: err.message || 'Không thể lưu giải thưởng.', type: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="max-w-[1000px] mx-auto bg-white rounded-[32px] shadow-xl border border-slate-100 p-6 sm:p-10 md:p-12 antialiased transition-all duration-500 ease-out transform opacity-0 translate-y-4 animate-[fadeInUp_0.6s_ease-out_forwards]">
-
-            {/* Header */}
-            <div className="mb-8 border-b border-slate-100 pb-6">
-                <h2 className="text-3xl font-bold text-[#1E293B] tracking-tight mb-2">Cấu hình & Phân công Giải đấu</h2>
-                <p className="text-[13px] text-slate-600">Thiết lập quy mô, tiêu chí chấm điểm (Rubric) và phân tách ban giám khảo phụ trách theo từng vòng.</p>
-            </div>
-
-            {/* Alert Message */}
+        <div className="mx-auto max-w-7xl space-y-6">
             {message.text && (
-                <div className={`mb-6 p-4 text-xs font-semibold rounded-lg border flex items-center gap-2 transition-all duration-300 transform translate-y-0 opacity-0 animate-[slideDown_0.25s_ease-out_forwards] ${
-                    message.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
+                <div className={`rounded-lg border p-4 text-sm font-semibold ${
+                    message.type === 'success'
+                        ? 'border-green-200 bg-green-50 text-green-700'
+                        : 'border-red-200 bg-red-50 text-red-700'
                 }`}>
-                    <span>{message.text}</span>
+                    {message.text}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-
-                {/* PHẦN 1: THÔNG TIN CHUNG */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    <div className="md:col-span-2">
-                        <label className="block text-xs font-bold text-slate-800 mb-1.5">Tên Giải Đấu *</label>
-                        <input
-                            type="text" required placeholder="VD: SEAL Hackathon Toàn Quốc 2026..."
-                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-slate-800 bg-white placeholder-slate-400 focus:outline-none focus:border-[#1E5BB8] transition-all duration-200 text-sm font-medium"
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-800 mb-1.5">Mùa giải (Season) *</label>
-                        <select
-                            className="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-slate-800 bg-white focus:outline-none focus:border-[#1E5BB8] transition-all duration-200 text-sm font-medium"
-                            value={formData.season}
-                            onChange={(e) => setFormData({...formData, season: e.target.value})}
-                        >
-                            <option value="SPRING">Spring (Mùa Xuân)</option>
-                            <option value="SUMMER">Summer (Mùa Hè)</option>
-                            <option value="FALL">Fall (Mùa Thu)</option>
-                        </select>
-                    </div>
+            <section className="rounded-lg border border-blue-100 bg-white p-8 shadow-sm">
+                <div className="mb-7">
+                    <h2 className="text-2xl font-black uppercase tracking-wide text-slate-900">1. Tạo giải đấu</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Lưu vào HackathonEvent, sinh Track, Round và TrackRoundMatrix theo ma trận track x vòng.
+                    </p>
                 </div>
 
-                {/* THÔNG SỐ SỐ LƯỢNG */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 bg-slate-50 p-5 rounded-2xl border border-slate-200/60">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-800 mb-1.5">Số đội tối đa *</label>
-                        <input type="number" required min="1" className="w-full px-4 py-2 rounded-lg border border-slate-300 text-slate-800 text-sm" value={formData.maxTeams} onChange={(e) => setFormData({...formData, maxTeams: e.target.value})} />
+                <form onSubmit={handleCreateEvent} className="space-y-6">
+                    <div className="grid gap-5 md:grid-cols-3">
+                        <div className="md:col-span-2">
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Tên giải đấu</label>
+                            <input required className="input-custom" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="SEAL Hackathon Spring 2026" />
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Mùa</label>
+                            <select className="input-custom" value={formData.season} onChange={(e) => setFormData({ ...formData, season: e.target.value })}>
+                                <option value="SPRING">Spring</option>
+                                <option value="SUMMER">Summer</option>
+                                <option value="FALL">Fall</option>
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-800 mb-1.5">Số Vòng thi *</label>
-                        <input type="number" required min="1" className="w-full px-4 py-2 rounded-lg border border-slate-300 text-slate-800 text-sm" value={formData.totalRounds} onChange={(e) => setFormData({...formData, totalRounds: e.target.value})} />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-800 mb-1.5">Số Bảng đấu *</label>
-                        <input type="number" required min="1" className="w-full px-4 py-2 rounded-lg border border-slate-300 text-slate-800 text-sm" value={formData.totalTracks} onChange={(e) => setFormData({...formData, totalTracks: e.target.value})} />
-                    </div>
-                </div>
 
-                {/* PHẦN 2: CHỌN NHÂN SỰ DẠNG KHUNG CUỘN */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Khung cuộn chọn Judge */}
-                    <div className="border border-slate-200 rounded-2xl p-5 bg-white">
-                        <label className="block text-xs font-bold text-slate-800 mb-1">Chọn Hội Đồng Giám Khảo (Judges)</label>
-                        <p className="text-[11px] text-slate-400 mb-3">Tích chọn các Staff có sẵn để đưa vào hội đồng.</p>
-                        <div className="h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2.5 bg-slate-50/50">
-                            {staffList.map(staff => (
-                                <label key={staff.id} className="flex items-center gap-3 cursor-pointer group select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.selectedJudges.includes(staff.id)}
-                                        onChange={() => handleCheckboxChange(staff.id, 'judge')}
-                                        className="h-4 w-4 rounded border-slate-300 text-[#1E5BB8] focus:ring-0"
-                                    />
-                                    <div className="text-xs">
-                                        <p className="font-semibold text-slate-800 group-hover:text-[#1E5BB8] transition-colors">{staff.fullName}</p>
-                                        <p className="text-slate-400 text-[11px]">{staff.email}</p>
-                                    </div>
-                                </label>
+                    <div className="grid gap-5 md:grid-cols-3">
+                        <div>
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Năm</label>
+                            <input required type="number" className="input-custom" value={formData.year} onChange={(e) => setFormData({ ...formData, year: Number(e.target.value) })} />
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Số vòng thi</label>
+                            <input required min="1" type="number" className="input-custom" value={formData.roundCount} onChange={(e) => setFormData({ ...formData, roundCount: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Deadline mặc định</label>
+                            <input type="datetime-local" className="input-custom" value={formData.submissionDeadline} onChange={(e) => setFormData({ ...formData, submissionDeadline: e.target.value })} />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-5 md:grid-cols-2">
+                        <input required type="datetime-local" className="input-custom" value={formData.regStartDate} onChange={(e) => setFormData({ ...formData, regStartDate: e.target.value })} aria-label="Mở đăng ký" />
+                        <input required type="datetime-local" className="input-custom" value={formData.regEndDate} onChange={(e) => setFormData({ ...formData, regEndDate: e.target.value })} aria-label="Đóng đăng ký" />
+                        <input required type="datetime-local" className="input-custom" value={formData.eventStartDate} onChange={(e) => setFormData({ ...formData, eventStartDate: e.target.value })} aria-label="Bắt đầu sự kiện" />
+                        <input required type="datetime-local" className="input-custom" value={formData.eventEndDate} onChange={(e) => setFormData({ ...formData, eventEndDate: e.target.value })} aria-label="Kết thúc sự kiện" />
+                    </div>
+
+                    <div>
+                        <div className="mb-3 flex items-center justify-between">
+                            <label className="block text-sm font-bold text-slate-700">Track</label>
+                            <button type="button" onClick={() => setFormData((current) => ({ ...current, tracks: [...current.tracks, ''] }))} className="btn-secondary">Thêm track</button>
+                        </div>
+                        <div className="space-y-3">
+                            {formData.tracks.map((track, index) => (
+                                <div key={index} className="flex gap-3">
+                                    <input required className="input-custom" value={track} onChange={(e) => updateTrack(index, e.target.value)} placeholder="Tên hạng mục thi" />
+                                    {formData.tracks.length > 1 && <button type="button" onClick={() => setFormData((current) => ({ ...current, tracks: current.tracks.filter((_, idx) => idx !== index) }))} className="btn-secondary">Xóa</button>}
+                                </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Khung cuộn chọn Mentor */}
-                    <div className="border border-slate-200 rounded-2xl p-5 bg-white">
-                        <label className="block text-xs font-bold text-slate-800 mb-1">Chọn Cố Vấn Chuyên Môn (Mentors)</label>
-                        <p className="text-[11px] text-slate-400 mb-3">Tích chọn các Staff có sẵn làm Mentor giải đấu.</p>
-                        <div className="h-40 overflow-y-auto border border-slate-200 rounded-lg p-3 space-y-2.5 bg-slate-50/50">
-                            {staffList.map(staff => (
-                                <label key={staff.id} className="flex items-center gap-3 cursor-pointer group select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.selectedMentors.includes(staff.id)}
-                                        onChange={() => handleCheckboxChange(staff.id, 'mentor')}
-                                        className="h-4 w-4 rounded border-slate-300 text-[#1E5BB8] focus:ring-0"
-                                    />
-                                    <div className="text-xs">
-                                        <p className="font-semibold text-slate-800 group-hover:text-[#1E5BB8] transition-colors">{staff.fullName}</p>
-                                        <p className="text-slate-400 text-[11px]">{staff.email}</p>
-                                    </div>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* PHẦN 3: THIẾT LẬP TIÊU CHÍ CHẤM ĐIỂM (RUBRIC MULTI-ROUND) */}
-                <div className="border border-slate-200 rounded-2xl p-5 bg-white space-y-4">
-                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <div>
-                            <h3 className="font-bold text-slate-800 text-sm">Cấu hình Tiêu chí chấm điểm (Rubric)</h3>
-                            <p className="text-[11px] text-slate-400">Thiết lập tiêu chí và trọng số % cho mỗi vòng thi.</p>
-                        </div>
-                        <button type="button" onClick={addRubricRow} className="text-xs font-bold text-[#1E5BB8] hover:underline">+ Thêm tiêu chí</button>
-                    </div>
-
-                    <div className="space-y-3">
-                        {formData.rubrics.map((rubric, idx) => (
-                            <div key={idx} className="grid grid-cols-12 gap-3 items-center animate-[slideDown_0.2s_ease-out]">
-                                <div className="col-span-3">
-                                    <select
-                                        className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-xs font-medium"
-                                        value={rubric.roundNumber}
-                                        onChange={(e) => {
-                                            const updated = [...formData.rubrics];
-                                            updated[idx].roundNumber = Number(e.target.value);
-                                            setFormData({...formData, rubrics: updated});
-                                        }}
-                                    >
-                                        {[...Array(Number(formData.totalRounds || 1))].map((_, i) => (
-                                            <option key={i+1} value={i+1}>Vòng {i+1}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="col-span-6">
-                                    <input
-                                        type="text" required placeholder="Tên tiêu chí (VD: Tính thực tiễn...)"
-                                        className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-xs font-medium"
-                                        value={rubric.criteria}
-                                        onChange={(e) => {
-                                            const updated = [...formData.rubrics];
-                                            updated[idx].criteria = e.target.value;
-                                            setFormData({...formData, rubrics: updated});
-                                        }}
-                                    />
-                                </div>
-                                <div className="col-span-3 flex items-center gap-2">
-                                    <input
-                                        type="number" required min="1" max="100" placeholder="Trọng số"
-                                        className="w-full px-3 py-1.5 border border-slate-300 rounded-md text-xs text-center font-medium"
-                                        value={rubric.weight || ''}
-                                        onChange={(e) => {
-                                            const updated = [...formData.rubrics];
-                                            updated[idx].weight = e.target.value;
-                                            setFormData({...formData, rubrics: updated});
-                                        }}
-                                    />
-                                    <span className="text-xs text-slate-500 font-bold">%</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* PHẦN 4: PHÂN CÔNG GIÁM KHẢO THEO VÒNG (Rút gọn chỉ chọn Vòng và Giám khảo) */}
-                <div className="border border-slate-200 rounded-2xl p-5 bg-white space-y-4">
-                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-                        <div>
-                            <h3 className="font-bold text-slate-800 text-sm">Phân công Hội đồng Giám khảo phụ trách Vòng thi</h3>
-                            <p className="text-[11px] text-slate-400">Chỉ định cụ thể Giám khảo nào sẽ tham gia chấm thi cho từng Vòng tương ứng.</p>
-                        </div>
-                        <button type="button" onClick={addAssignmentRow} className="text-xs font-bold text-[#1E5BB8] hover:underline">+ Thêm phân công</button>
-                    </div>
-
-                    <div className="space-y-3">
-                        {formData.judgeAssignments.map((assign, idx) => (
-                            <div key={idx} className="grid grid-cols-12 gap-4 items-center animate-[slideDown_0.2s_ease-out]">
-                                {/* Chọn Vòng thi */}
-                                <div className="col-span-4">
-                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">VÒNG THI</label>
-                                    <select
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:border-[#1E5BB8] focus:outline-none"
-                                        value={assign.roundNumber}
-                                        onChange={(e) => {
-                                            const updated = [...formData.judgeAssignments];
-                                            updated[idx].roundNumber = Number(e.target.value);
-                                            setFormData({...formData, judgeAssignments: updated});
-                                        }}
-                                    >
-                                        {[...Array(Number(formData.totalRounds || 1))].map((_, i) => (
-                                            <option key={i+1} value={i+1}>Vòng {i+1}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Chọn Giám Khảo từ danh sách đã chọn ở trên */}
-                                <div className="col-span-8">
-                                    <label className="block text-[10px] font-bold text-slate-400 mb-1">GIÁM KHẢO PHỤ TRÁCH</label>
-                                    <select
-                                        required
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-md text-xs font-medium focus:border-[#1E5BB8] focus:outline-none"
-                                        value={assign.judgeId}
-                                        onChange={(e) => {
-                                            const updated = [...formData.judgeAssignments];
-                                            updated[idx].judgeId = e.target.value;
-                                            setFormData({...formData, judgeAssignments: updated});
-                                        }}
-                                    >
-                                        <option value="">-- Chọn Giám khảo trong hội đồng --</option>
-                                        {staffList
-                                            .filter(st => formData.selectedJudges.includes(st.id))
-                                            .map(st => (
-                                                <option key={st.id} value={st.id}>{st.fullName} ({st.email})</option>
-                                            ))
-                                        }
-                                    </select>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* THỜI GIAN SỰ KIỆN */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="p-4 rounded-xl bg-[#1E5BB8]/5 border border-[#1E5BB8]/10 space-y-3">
-                        <h4 className="font-bold text-[#1E5BB8] text-xs uppercase tracking-wider">Thời gian Đăng ký</h4>
-                        <div className="grid grid-cols-2 gap-2">
-                            <input type="datetime-local" required className="w-full px-2 py-1.5 rounded border text-xs" value={formData.regStartDate} onChange={(e) => setFormData({...formData, regStartDate: e.target.value})} />
-                            <input type="datetime-local" required className="w-full px-2 py-1.5 rounded border text-xs" value={formData.regEndDate} onChange={(e) => setFormData({...formData, regEndDate: e.target.value})} />
-                        </div>
-                    </div>
-                    <div className="p-4 rounded-xl bg-slate-100/60 border border-slate-200 space-y-3">
-                        <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">Thời gian Thi đấu</h4>
-                        <div className="grid grid-cols-2 gap-2">
-                            <input type="datetime-local" required className="w-full px-2 py-1.5 rounded border text-xs" value={formData.eventStartDate} onChange={(e) => setFormData({...formData, eventStartDate: e.target.value})} />
-                            <input type="datetime-local" required className="w-full px-2 py-1.5 rounded border text-xs" value={formData.eventEndDate} onChange={(e) => setFormData({...formData, eventEndDate: e.target.value})} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Button gửi */}
-                <div className="pt-4 border-t border-slate-100 flex justify-end">
-                    <button
-                        type="submit" disabled={loading}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#1E5BB8] text-white px-8 py-2.5 text-sm font-semibold hover:bg-[#164384] active:scale-[0.99] disabled:opacity-60 transition-all duration-200 ease-in-out"
-                    >
-                        <span>{loading ? 'Đang khởi tạo...' : 'Tạo Giải Đấu Mới'}</span>
+                    <button type="submit" disabled={loading} className="btn-primary w-full">
+                        {loading ? 'Đang lưu...' : 'Tạo event và sinh matrix'}
                     </button>
+                </form>
+            </section>
+
+            <section className="rounded-lg border border-blue-100 bg-white p-8 shadow-sm">
+                <h2 className="text-2xl font-black uppercase tracking-wide text-slate-900">2. Cấu hình event đã tạo</h2>
+                <div className="mt-5 grid gap-5 lg:grid-cols-[320px_1fr]">
+                    <div>
+                        <label className="mb-1 block text-sm font-bold text-slate-700">Chọn event</label>
+                        <select className="input-custom" value={selectedEventId} onChange={(e) => {
+                            const id = e.target.value;
+                            const event = events.find((item) => String(item.id) === String(id));
+                            setSelectedEventId(id);
+                            setSelectedMatrixId(event?.matrices?.[0]?.id || '');
+                        }}>
+                            {events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
+                        </select>
+
+                        <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+                            <p className="font-black">{selectedEvent?.name || 'Chưa có event'}</p>
+                            <p>{selectedEvent?.tracks?.length || 0} track - {selectedEvent?.rounds?.length || 0} vòng - {selectedEvent?.teamCount || 0} đội</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleSaveMatrix} className="space-y-5 rounded-lg border border-blue-100 p-5">
+                        <h3 className="font-black uppercase tracking-wide text-slate-900">Cấu hình TrackRoundMatrix</h3>
+                        <select className="input-custom" value={selectedMatrixId} onChange={(e) => setSelectedMatrixId(e.target.value)}>
+                            {(selectedEvent?.matrices || []).map((matrix) => (
+                                <option key={matrix.id} value={matrix.id}>{matrix.roundName} - {matrix.trackName}</option>
+                            ))}
+                        </select>
+
+                        <input className="input-custom" value={matrixForm.guidelineUrl} onChange={(e) => setMatrixForm({ ...matrixForm, guidelineUrl: e.target.value })} placeholder="Link guideline / đề bài PDF" />
+                        <input type="datetime-local" className="input-custom" value={matrixForm.submissionDeadline} onChange={(e) => setMatrixForm({ ...matrixForm, submissionDeadline: e.target.value })} />
+
+                        <div className="grid gap-5 md:grid-cols-2">
+                            <div>
+                                <p className="mb-2 text-sm font-bold text-slate-700">Mentor</p>
+                                <div className="max-h-40 space-y-2 overflow-auto rounded-lg border border-blue-100 p-3">
+                                    {mentors.length === 0 ? <p className="text-sm text-slate-500">Chưa có mentor.</p> : mentors.map((user) => (
+                                        <label key={user.id} className="flex items-center gap-2 text-sm">
+                                            <input type="checkbox" checked={matrixForm.mentorIds.some((id) => String(id) === String(user.id))} onChange={() => toggleId('mentorIds', user.id)} />
+                                            {user.fullName} ({user.email})
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <p className="mb-2 text-sm font-bold text-slate-700">Judge</p>
+                                <div className="max-h-40 space-y-2 overflow-auto rounded-lg border border-blue-100 p-3">
+                                    {judges.length === 0 ? <p className="text-sm text-slate-500">Chưa có judge.</p> : judges.map((user) => (
+                                        <label key={user.id} className="flex items-center gap-2 text-sm">
+                                            <input type="checkbox" checked={matrixForm.judgeIds.some((id) => String(id) === String(user.id))} onChange={() => toggleId('judgeIds', user.id)} />
+                                            {user.fullName} ({user.email})
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" disabled={!selectedMatrixId || loading} className="btn-primary w-full">Lưu cấu hình matrix</button>
+                    </form>
                 </div>
-            </form>
+            </section>
+
+            <section className="rounded-lg border border-blue-100 bg-white p-8 shadow-sm">
+                <h2 className="text-2xl font-black uppercase tracking-wide text-slate-900">3. Cấu hình giải thưởng</h2>
+                <form onSubmit={handleCreatePrize} className="mt-5 grid gap-4 md:grid-cols-[1fr_1fr_220px_auto]">
+                    <input required className="input-custom" value={prizeForm.name} onChange={(e) => setPrizeForm({ ...prizeForm, name: e.target.value })} placeholder="Tên giải: Giải nhất" />
+                    <input className="input-custom" value={prizeForm.description} onChange={(e) => setPrizeForm({ ...prizeForm, description: e.target.value })} placeholder="Mô tả / phần thưởng" />
+                    <select className="input-custom" value={prizeForm.teamId} onChange={(e) => setPrizeForm({ ...prizeForm, teamId: e.target.value })}>
+                        <option value="">Chưa trao đội</option>
+                        {eventTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+                    </select>
+                    <button type="submit" disabled={!selectedEventId || loading} className="btn-primary">Lưu giải</button>
+                </form>
+            </section>
         </div>
     );
 }

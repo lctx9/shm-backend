@@ -1,127 +1,122 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
 
 export default function UserManagement() {
     const [users, setUsers] = useState([]);
+    const [staffForm, setStaffForm] = useState({ fullName: '', email: '', password: '1', role: 'JUDGE' });
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-
-    // Tự động gọi API lấy danh sách user khi vào trang
-    useEffect(() => {
-        fetchUsers();
-    }, []);
 
     const fetchUsers = async () => {
         try {
             setLoading(true);
-            // Gọi API lấy danh sách user (giả định backend hỗ trợ endpoint này)
             const response = await axiosClient.get('/users');
-
-            // AxiosClient trả về response.result dựa theo cấu trúc ApiResponse của Spring Boot
             setUsers(response.result || []);
+            setError('');
         } catch (err) {
-            setError('Không thể tải danh sách người dùng. Có thể API chưa được thiết lập ở Backend.');
+            setError(err.message || 'Không thể tải danh sách người dùng.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleUpdateStatus = async (userId, newStatus) => {
-        if (!window.confirm(`Bạn có chắc muốn ${newStatus === 'APPROVED' ? 'DUYỆT' : 'TỪ CHỐI'} tài khoản này?`)) return;
+    useEffect(() => {
+        fetchUsers();
+    }, []);
 
+    const handleUpdateStatus = async (userId, status) => {
         try {
-            // Gọi API cập nhật trạng thái tài khoản
-            await axiosClient.put(`/users/${userId}/status`, { status: newStatus });
-
-            // Cập nhật lại giao diện ngay lập tức mà không cần load lại trang
-            setUsers(users.map(user =>
-                user.id === userId ? { ...user, status: newStatus } : user
-            ));
-
+            await axiosClient.put(`/users/${userId}/status`, { status });
+            await fetchUsers();
         } catch (err) {
-            alert('Lỗi cập nhật: ' + (err.message || 'Hệ thống đang gặp sự cố!'));
+            setError(err.message || 'Không thể cập nhật trạng thái.');
+        }
+    };
+
+    const handleCreateStaff = async (e) => {
+        e.preventDefault();
+        try {
+            setSaving(true);
+            await axiosClient.post('/users/staff', staffForm);
+            setStaffForm({ fullName: '', email: '', password: '1', role: 'JUDGE' });
+            await fetchUsers();
+        } catch (err) {
+            setError(err.message || 'Không thể tạo tài khoản staff.');
+        } finally {
+            setSaving(false);
         }
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <div>
-                    <h2 className="text-xl font-bold text-gray-800">Quản Lý Tài Khoản</h2>
-                    <p className="text-sm text-gray-500 mt-1">Duyệt hoặc từ chối các đăng ký tham gia từ sinh viên.</p>
+        <div className="mx-auto max-w-7xl space-y-6">
+            {error && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+
+            <section className="rounded-lg border border-blue-100 bg-white p-8 shadow-sm">
+                <h2 className="text-2xl font-black uppercase tracking-wide text-slate-900">Tạo tài khoản staff</h2>
+                <p className="mt-2 text-sm text-slate-600">Coordinator tạo Mentor/Judge bằng tài khoản thật, sau đó phân công vào matrix.</p>
+
+                <form onSubmit={handleCreateStaff} className="mt-6 grid gap-4 md:grid-cols-[1fr_1fr_160px_140px_auto]">
+                    <input required className="input-custom" value={staffForm.fullName} onChange={(e) => setStaffForm({ ...staffForm, fullName: e.target.value })} placeholder="Họ tên" />
+                    <input required type="email" className="input-custom" value={staffForm.email} onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })} placeholder="email@fpt.edu.vn" />
+                    <input required className="input-custom" value={staffForm.password} onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })} placeholder="Mật khẩu" />
+                    <select className="input-custom" value={staffForm.role} onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}>
+                        <option value="JUDGE">Judge</option>
+                        <option value="MENTOR">Mentor</option>
+                        <option value="COORDINATOR">Coordinator</option>
+                    </select>
+                    <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Đang tạo...' : 'Tạo'}</button>
+                </form>
+            </section>
+
+            <section className="rounded-lg border border-blue-100 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50 px-6 py-4">
+                    <div>
+                        <h2 className="text-xl font-black uppercase tracking-wide text-slate-900">Quản lý tài khoản</h2>
+                        <p className="mt-1 text-sm text-slate-600">Duyệt, từ chối hoặc theo dõi role người dùng.</p>
+                    </div>
+                    <button type="button" onClick={fetchUsers} className="btn-secondary">Làm mới</button>
                 </div>
-                <button onClick={fetchUsers} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 text-gray-700 shadow-sm transition-all">
-                    🔄 Làm mới
-                </button>
-            </div>
 
-            {error && <div className="p-4 m-6 mb-0 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100">{error}</div>}
-
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                    <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
-                        <th className="px-6 py-4 font-medium">Họ & Tên / MSSV</th>
-                        <th className="px-6 py-4 font-medium">Email</th>
-                        <th className="px-6 py-4 font-medium">Trường Đại Học</th>
-                        <th className="px-6 py-4 font-medium">Trạng Thái</th>
-                        <th className="px-6 py-4 font-medium text-right">Thao Tác</th>
-                    </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                    {loading ? (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="border-b border-blue-100 bg-white text-xs font-black uppercase tracking-wide text-slate-500">
                         <tr>
-                            <td colSpan="5" className="px-6 py-8 text-center text-gray-500">Đang tải dữ liệu...</td>
+                            <th className="px-6 py-4">Người dùng</th>
+                            <th className="px-6 py-4">Email</th>
+                            <th className="px-6 py-4">Role</th>
+                            <th className="px-6 py-4">Trạng thái</th>
+                            <th className="px-6 py-4 text-right">Thao tác</th>
                         </tr>
-                    ) : users.length === 0 ? (
-                        <tr>
-                            <td colSpan="5" className="px-6 py-8 text-center text-gray-500">Chưa có người dùng nào trên hệ thống.</td>
-                        </tr>
-                    ) : (
-                        users.map((user) => (
-                            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                        </thead>
+                        <tbody className="divide-y divide-blue-50">
+                        {loading ? (
+                            <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">Đang tải...</td></tr>
+                        ) : users.length === 0 ? (
+                            <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500">Chưa có người dùng.</td></tr>
+                        ) : users.map((user) => (
+                            <tr key={user.id} className="hover:bg-blue-50/40">
                                 <td className="px-6 py-4">
-                                    <div className="font-medium text-gray-900">{user.fullName}</div>
-                                    <div className="text-xs text-gray-500 mt-1">{user.studentId || 'N/A'}</div>
+                                    <p className="font-bold text-slate-900">{user.fullName}</p>
+                                    <p className="text-xs text-slate-500">{user.studentId || user.universityName || 'Staff'}</p>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                                <td className="px-6 py-4">
-                                    <span className="text-sm text-gray-600">{user.universityName}</span>
-                                </td>
-                                <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border
-                      ${user.status === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-200' :
-                        user.status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-200' :
-                            'bg-amber-50 text-amber-700 border-amber-200'}
-                    `}>
-                      {user.status === 'PENDING' ? '⏳ Chờ Duyệt' :
-                          user.status === 'APPROVED' ? '✅ Đã Duyệt' : '❌ Đã Từ Chối'}
-                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-right space-x-2">
+                                <td className="px-6 py-4 text-sm text-slate-600">{user.email}</td>
+                                <td className="px-6 py-4"><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">{user.role}</span></td>
+                                <td className="px-6 py-4"><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-700">{user.status}</span></td>
+                                <td className="px-6 py-4 text-right">
                                     {user.status === 'PENDING' && (
-                                        <>
-                                            <button
-                                                onClick={() => handleUpdateStatus(user.id, 'APPROVED')}
-                                                className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition-colors"
-                                            >
-                                                Duyệt
-                                            </button>
-                                            <button
-                                                onClick={() => handleUpdateStatus(user.id, 'REJECTED')}
-                                                className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded hover:bg-red-200 transition-colors"
-                                            >
-                                                Từ chối
-                                            </button>
-                                        </>
+                                        <div className="flex justify-end gap-2">
+                                            <button type="button" onClick={() => handleUpdateStatus(user.id, 'APPROVED')} className="btn-primary">Duyệt</button>
+                                            <button type="button" onClick={() => handleUpdateStatus(user.id, 'REJECTED')} className="btn-secondary">Từ chối</button>
+                                        </div>
                                     )}
                                 </td>
                             </tr>
-                        ))
-                    )}
-                    </tbody>
-                </table>
-            </div>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
         </div>
     );
 }

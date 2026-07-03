@@ -27,7 +27,6 @@ public class ScoreService {
 
     @Transactional
     public Score gradeSubmission(ScoreRequest request) {
-        // 1. Lấy Giám khảo đang đăng nhập
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User judge = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giám khảo"));
@@ -35,20 +34,18 @@ public class ScoreService {
         Submission submission = submissionRepository.findById(request.getSubmissionId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy bài nộp"));
 
-        // 2. Kiểm tra xem Giám khảo này đã chấm bài này chưa
         Optional<Score> existingScoreOpt = scoreRepository.findBySubmissionIdAndJudgeId(
                 submission.getId(), judge.getId());
 
+        Score savedScore;
         if (existingScoreOpt.isPresent()) {
-            // NẾU ĐÃ CHẤM RỒI -> TIẾN HÀNH SỬA ĐIỂM VÀ LƯU AUDIT LOG
             Score existingScore = existingScoreOpt.get();
             Double oldScoreValue = existingScore.getScoreValue();
 
-            if (request.getEditReason() == null || request.getEditReason().isEmpty()) {
-                throw new RuntimeException("Phải cung cấp lý do (editReason) khi sửa điểm!");
+            if (request.getEditReason() == null || request.getEditReason().isBlank()) {
+                throw new RuntimeException("Phải cung cấp lý do khi sửa điểm");
             }
 
-            // Ghi log
             AuditLog auditLog = AuditLog.builder()
                     .score(existingScore)
                     .judge(judge)
@@ -58,20 +55,24 @@ public class ScoreService {
                     .build();
             auditLogRepository.save(auditLog);
 
-            // Cập nhật điểm mới
             existingScore.setScoreValue(request.getScoreValue());
             existingScore.setComment(request.getComment());
-            return scoreRepository.save(existingScore);
-
+            savedScore = scoreRepository.save(existingScore);
         } else {
-            // NẾU CHƯA CHẤM -> TẠO ĐIỂM MỚI
             Score newScore = Score.builder()
                     .submission(submission)
                     .judge(judge)
                     .scoreValue(request.getScoreValue())
                     .comment(request.getComment())
                     .build();
-            return scoreRepository.save(newScore);
+            savedScore = scoreRepository.save(newScore);
         }
+
+        submission.setScore(request.getScoreValue());
+        submission.setFeedback(request.getComment());
+        submission.setIsGraded(true);
+        submissionRepository.save(submission);
+
+        return savedScore;
     }
 }
