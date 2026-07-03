@@ -24,4 +24,16 @@ public class Submission extends BaseEntity {
 
     private boolean isFlagged;
     private String flagReason;
+
+    // Thêm các trường này vào file Submission.java
+
+    @Column(name = "score")
+    private Double score; // Điểm số
+
+    @Column(name = "feedback", columnDefinition = "TEXT")
+    private String feedback; // Lời nhận xét
+
+    @Column(name = "is_graded")
+    private Boolean isGraded = false; // Trạng thái: Đã chấm hay chưa
+
 }
