@@ -26,6 +26,16 @@ public class ScoringCriteriaTemplate extends BaseEntity {
     @Column(name = "max_score", nullable = false)
     private Double maxScore;
 
+    // THÊM MỚI: Trọng số của tiêu chí chấm điểm (VD: 0.3, 0.4) phục vụ tính điểm hệ số
+    @Column(name = "weight", nullable = false)
+    @Builder.Default
+    private Double weight = 1.0;
+
+    // THÊM MỚI: Liên kết tiêu chí này thuộc về Vòng thi (Round) nào
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "round_id")
+    private Round round;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean isActive = true;

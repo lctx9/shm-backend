@@ -39,7 +39,7 @@ public class RankingService {
             double totalWeightedScore = 0.0;
 
             if (scores != null && !scores.isEmpty()) {
-                // Nhóm điểm số theo từng tiêu chí chấm điểm
+                // ĐÃ ĐỒNG BỘ: Nhóm điểm số theo thực thể EventScoringCriteria chuẩn xác từ JudgeScore
                 Map<EventScoringCriteria, List<JudgeScore>> scoresByCriteria = scores.stream()
                         .collect(Collectors.groupingBy(JudgeScore::getCriteria));
 
@@ -53,8 +53,9 @@ public class RankingService {
                             .average()
                             .orElse(0.0);
 
-                    // Nhân với trọng số của tiêu chí đó và cộng dồn vào tổng điểm của đội
-                    totalWeightedScore += (avgScoreForCriteria * criteria.getWeight());
+                    // Sử dụng trường weight đã có sẵn trong EventScoringCriteria của bạn
+                    double weight = (criteria.getWeight() != null) ? criteria.getWeight() : 1.0;
+                    totalWeightedScore += (avgScoreForCriteria * weight);
                 }
             }
 
@@ -107,6 +108,7 @@ public class RankingService {
         return rankingRepository.saveAll(rankings);
     }
 
+    // GIỮ NGUYÊN: Tên hàm cũ không đổi để tránh conflict khi push Git
     public List<TeamRoundRanking> getRankingsByRound(UUID roundId) {
         return rankingRepository.findByRoundId(roundId);
     }

@@ -42,4 +42,5 @@ public class EventScoringCriteria extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean isActive = true;
+
 }
