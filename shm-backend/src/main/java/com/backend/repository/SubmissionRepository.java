@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     List<Submission> findByTeamId(Long teamId);
+    List<Submission> findByIsGradedTrueOrderByScoreDesc();
+    long countByIsGradedFalse();
 }

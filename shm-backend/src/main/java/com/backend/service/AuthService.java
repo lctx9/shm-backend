@@ -28,8 +28,6 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        // TODO: Đoạn này sau này sẽ check request.getOtp() khớp với OTP trong Redis hay không
-
         // Tạo User mới (Mặc định khi sinh viên tự đăng ký sẽ có role MEMBER)
         User newUser = User.builder()
                 .fullName(request.getFullName())
@@ -37,7 +35,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword())) // Mã hóa mật khẩu
                 .studentId(request.getStudentId())
                 .isFptStudent(request.isFptStudent())
-                .universityName(request.getUniversityName())
+                .universityName(request.isFptStudent() ? "Đại học FPT" : request.getUniversityName())
                 .studentCardUrl(request.getStudentCardUrl())
                 .role(RoleType.MEMBER)
                 .status(AccountStatus.PENDING) // Cần Coordinator duyệt
@@ -57,11 +55,6 @@ public class AuthService {
         if (!isMatch) {
             throw new AppException(ErrorCode.INVALID_PASSWORD);
         }
-
-        // (Tùy chọn) Kiểm tra trạng thái tài khoản
-        // if (user.getStatus() != AccountStatus.APPROVED) {
-        //     throw new RuntimeException("Tài khoản chưa được phê duyệt");
-        // }
 
         // Sinh token
         String token = jwtProvider.generateToken(user.getEmail());

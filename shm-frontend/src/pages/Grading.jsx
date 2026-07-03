@@ -1,146 +1,180 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
 
 export default function Grading() {
     const [submissions, setSubmissions] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    // State quản lý bài đang được chọn để chấm
     const [selectedSub, setSelectedSub] = useState(null);
-    const [gradeForm, setGradeForm] = useState({ score: '', feedback: '' });
-    const [submitLoading, setSubmitLoading] = useState(false);
-
-    useEffect(() => {
-        fetchSubmissions();
-    }, []);
+    const [gradeForm, setGradeForm] = useState({ score: '', feedback: '', editReason: '' });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
 
     const fetchSubmissions = async () => {
         try {
             setLoading(true);
-            const res = await axiosClient.get('/submissions');
-            setSubmissions(res.result || []);
+            const response = await axiosClient.get('/submissions');
+            setSubmissions(response.result || []);
+            setError('');
         } catch (err) {
-            console.error('Lỗi lấy danh sách bài nộp:', err);
+            setError(err.message || 'Không thể tải danh sách bài nộp.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSelectToGrade = (sub) => {
-        setSelectedSub(sub);
+    useEffect(() => {
+        fetchSubmissions();
+    }, []);
+
+    const handleSelect = (submission) => {
+        setSelectedSub(submission);
         setGradeForm({
-            score: sub.score || '',
-            feedback: sub.feedback || ''
+            score: submission.score || '',
+            feedback: submission.feedback || '',
+            editReason: '',
         });
     };
 
     const handleSubmitGrade = async (e) => {
         e.preventDefault();
-        if (gradeForm.score < 0 || gradeForm.score > 100) {
-            alert("Điểm số phải nằm trong khoảng từ 0 đến 100");
+
+        if (Number(gradeForm.score) < 0 || Number(gradeForm.score) > 100) {
+            setError('Điểm số phải nằm trong khoảng 0 đến 100.');
             return;
         }
 
         try {
-            setSubmitLoading(true);
-            await axiosClient.put(`/submissions/${selectedSub.id}/grade`, {
-                score: parseFloat(gradeForm.score),
-                feedback: gradeForm.feedback
+            setSaving(true);
+            await axiosClient.post('/scores/grade', {
+                submissionId: selectedSub.id,
+                scoreValue: Number(gradeForm.score),
+                comment: gradeForm.feedback,
+                editReason: selectedSub.graded ? gradeForm.editReason : '',
             });
-
-            alert('✅ Chấm điểm thành công!');
-            setSelectedSub(null); // Đóng form
-            fetchSubmissions();   // Tải lại danh sách để cập nhật trạng thái
+            setSelectedSub(null);
+            await fetchSubmissions();
         } catch (err) {
-            alert(err.response?.data?.message || 'Có lỗi khi chấm điểm!');
+            setError(err.message || 'Không thể lưu điểm.');
         } finally {
-            setSubmitLoading(false);
+            setSaving(false);
         }
     };
 
-    if (loading) return <div className="p-8 text-center text-gray-500">Đang tải danh sách bài thi...</div>;
+    if (loading) {
+        return <div className="rounded-lg bg-white p-8 text-center text-gray-500">Đang tải danh sách bài nộp...</div>;
+    }
 
     return (
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-6">
-
-            {/* CỘT TRÁI: DANH SÁCH BÀI THI */}
-            <div className={`flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ${selectedSub ? 'hidden md:block md:w-1/2' : 'w-full'}`}>
-                <div className="p-5 border-b border-gray-200 bg-gray-50">
-                    <h2 className="text-xl font-bold text-gray-800">📋 Danh sách bài dự thi</h2>
+        <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_420px]">
+            <section className="rounded-lg border border-blue-100 bg-white shadow-sm">
+                <div className="border-b border-blue-100 bg-blue-50 px-6 py-4">
+                    <h2 className="text-lg font-black uppercase tracking-wide text-slate-900">Bài nộp cần chấm</h2>
                 </div>
+
+                {error && (
+                    <div className="m-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                        {error}
+                    </div>
+                )}
 
                 {submissions.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">Hiện chưa có đội nào nộp bài.</div>
+                    <div className="p-8 text-center text-gray-500">Chưa có bài nộp nào trong database.</div>
                 ) : (
-                    <ul className="divide-y divide-gray-100 max-h-[70vh] overflow-y-auto">
-                        {submissions.map((sub) => (
-                            <li key={sub.id} className={`p-5 hover:bg-indigo-50 transition-colors cursor-pointer ${selectedSub?.id === sub.id ? 'bg-indigo-50 border-l-4 border-indigo-600' : ''}`}
-                                onClick={() => handleSelectToGrade(sub)}>
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-bold text-gray-900 text-lg">Đội thi ID: {sub.teamId || 'Chưa rõ'}</h3>
-                                    <span className={`px-2 py-1 text-xs font-bold rounded-full ${sub.isGraded ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {sub.isGraded ? 'Đã chấm' : 'Chờ chấm'}
-                  </span>
+                    <div className="divide-y divide-blue-50">
+                        {submissions.map((submission) => (
+                            <button
+                                type="button"
+                                key={submission.id}
+                                onClick={() => handleSelect(submission)}
+                                className={`block w-full px-6 py-5 text-left transition hover:bg-blue-50 ${
+                                    selectedSub?.id === submission.id ? 'bg-blue-50' : ''
+                                }`}
+                            >
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p className="font-black text-slate-900">{submission.teamName || `Đội #${submission.teamId}`}</p>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            {submission.roundName || 'Vòng thi'} - {submission.trackName || 'Track'}
+                                        </p>
+                                        <p className="mt-1 truncate text-sm text-blue-700">{submission.fileUrl}</p>
+                                    </div>
+                                    <span className={`rounded-full px-3 py-1 text-xs font-black ${
+                                        submission.graded ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                    }`}>
+                                        {submission.graded ? 'Đã chấm' : 'Chờ chấm'}
+                                    </span>
                                 </div>
-                                <p className="text-sm text-gray-600 truncate">Link: {sub.fileUrl}</p>
-                                {sub.isGraded && (
-                                    <p className="text-sm font-medium text-indigo-600 mt-2">Điểm: {sub.score}/100</p>
-                                )}
-                            </li>
+                            </button>
                         ))}
-                    </ul>
-                )}
-            </div>
-
-            {/* CỘT PHẢI: FORM CHẤM ĐIỂM (Chỉ hiện khi click vào 1 bài) */}
-            {selectedSub && (
-                <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col">
-                    <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-indigo-50">
-                        <h2 className="text-xl font-bold text-indigo-900">⚖️ Chấm điểm Đội {selectedSub.teamId}</h2>
-                        <button onClick={() => setSelectedSub(null)} className="text-gray-500 hover:text-red-500 md:hidden">✕ Đóng</button>
                     </div>
+                )}
+            </section>
 
-                    <div className="p-6 flex-1 overflow-y-auto">
-                        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                            <p className="text-sm text-gray-500 font-medium mb-1">Tài liệu dự án (Click để xem):</p>
-                            <a href={selectedSub.fileUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-bold hover:underline break-all">
-                                {selectedSub.fileUrl}
-                            </a>
-                        </div>
+            <section className="rounded-lg border border-blue-100 bg-white p-6 shadow-sm">
+                {selectedSub ? (
+                    <>
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">
+                            {selectedSub.roundName} - {selectedSub.trackName}
+                        </p>
+                        <h2 className="mt-2 text-xl font-black uppercase tracking-wide text-slate-900">
+                            {selectedSub.teamName || `Đội #${selectedSub.teamId}`}
+                        </h2>
+                        <a
+                            href={selectedSub.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-4 block break-all rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-blue-700"
+                        >
+                            {selectedSub.fileUrl}
+                        </a>
 
-                        <form onSubmit={handleSubmitGrade} className="space-y-5">
+                        <form onSubmit={handleSubmitGrade} className="mt-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Điểm số (0 - 100) <span className="text-red-500">*</span></label>
+                                <label className="mb-1 block text-sm font-bold text-slate-700">Điểm số</label>
                                 <input
-                                    type="number" required step="0.1" min="0" max="100"
-                                    className="w-full text-2xl px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-indigo-600 font-black"
-                                    value={gradeForm.score} onChange={(e) => setGradeForm({...gradeForm, score: e.target.value})}
+                                    required
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="100"
+                                    className="input-custom"
+                                    value={gradeForm.score}
+                                    onChange={(e) => setGradeForm({ ...gradeForm, score: e.target.value })}
                                 />
                             </div>
-
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Nhận xét chi tiết <span className="text-red-500">*</span></label>
+                                <label className="mb-1 block text-sm font-bold text-slate-700">Nhận xét</label>
                                 <textarea
-                                    required rows="5"
-                                    placeholder="Ghi chú điểm mạnh, điểm yếu và gợi ý cải thiện cho nhóm..."
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50"
-                                    value={gradeForm.feedback} onChange={(e) => setGradeForm({...gradeForm, feedback: e.target.value})}
-                                ></textarea>
+                                    required
+                                    rows="6"
+                                    className="input-custom"
+                                    value={gradeForm.feedback}
+                                    onChange={(e) => setGradeForm({ ...gradeForm, feedback: e.target.value })}
+                                />
                             </div>
-
-                            <div className="pt-4 flex gap-3">
-                                <button type="button" onClick={() => setSelectedSub(null)} className="px-6 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors">
-                                    Hủy bỏ
-                                </button>
-                                <button type="submit" disabled={submitLoading} className="flex-1 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-md">
-                                    {submitLoading ? 'Đang lưu...' : 'Lưu Điểm Số'}
-                                </button>
-                            </div>
+                            {selectedSub.graded && (
+                                <div>
+                                    <label className="mb-1 block text-sm font-bold text-slate-700">Lý do sửa điểm</label>
+                                    <input
+                                        required
+                                        className="input-custom"
+                                        value={gradeForm.editReason}
+                                        onChange={(e) => setGradeForm({ ...gradeForm, editReason: e.target.value })}
+                                        placeholder="Ví dụ: rà soát lại rubric sau khi trao đổi với BTC"
+                                    />
+                                </div>
+                            )}
+                            <button type="submit" disabled={saving} className="btn-primary w-full">
+                                {saving ? 'Đang lưu...' : 'Lưu điểm'}
+                            </button>
                         </form>
+                    </>
+                ) : (
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-6 text-sm font-semibold text-blue-900">
+                        Chọn một bài nộp ở bên trái để bắt đầu chấm điểm.
                     </div>
-                </div>
-            )}
-
+                )}
+            </section>
         </div>
     );
 }

@@ -1,190 +1,256 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 
 export default function MyTeam() {
-    // State quản lý thông tin đội đã có
-    const [team, setTeam] = useState(null);
-    const [loadingTeam, setLoadingTeam] = useState(true);
+    const [searchParams] = useSearchParams();
+    const preselectedEventId = searchParams.get('eventId');
     const role = localStorage.getItem('role');
 
-    // State cho Form tạo đội mới
+    const [team, setTeam] = useState(null);
+    const [events, setEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState('');
     const [formData, setFormData] = useState({
         name: '',
         type: 'PUBLIC',
         joinPassword: '',
-        trackId: 1,
-        eventId: 1
+        eventId: '',
+        trackId: '',
     });
-    const [loadingCreate, setLoadingCreate] = useState(false);
-    const [error, setError] = useState('');
 
     useEffect(() => {
-        fetchMyTeam();
-    }, []);
+        const bootstrap = async () => {
+            try {
+                setLoading(true);
+                const [teamRes, eventsRes] = await Promise.allSettled([
+                    axiosClient.get('/teams/my-team'),
+                    axiosClient.get('/events'),
+                ]);
 
-    // 1. Hàm lấy thông tin đội hiện tại
-    const fetchMyTeam = async () => {
-        try {
-            setLoadingTeam(true);
-            const response = await axiosClient.get('/teams/my-team');
-            setTeam(response.result); // Nếu có đội, lưu vào state
-        } catch (err) {
-            setTeam(null); // Không có đội (báo lỗi 404) thì set null để hiện form tạo
-        } finally {
-            setLoadingTeam(false);
-        }
+                if (teamRes.status === 'fulfilled') {
+                    setTeam(teamRes.value.result || null);
+                }
+
+                if (eventsRes.status === 'fulfilled') {
+                    const loadedEvents = eventsRes.value.result || [];
+                    setEvents(loadedEvents);
+                    const firstEvent = loadedEvents.find((item) => String(item.id) === String(preselectedEventId)) || loadedEvents[0];
+                    const firstTrack = firstEvent?.tracks?.[0];
+                    setFormData((current) => ({
+                        ...current,
+                        eventId: firstEvent?.id || '',
+                        trackId: firstTrack?.id || '',
+                    }));
+                }
+            } catch (err) {
+                setError(err.message || 'Không thể tải dữ liệu đội thi.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        bootstrap();
+    }, [preselectedEventId]);
+
+    const selectedEvent = useMemo(
+        () => events.find((event) => String(event.id) === String(formData.eventId)),
+        [events, formData.eventId]
+    );
+
+    const handleEventChange = (eventId) => {
+        const nextEvent = events.find((event) => String(event.id) === String(eventId));
+        setFormData((current) => ({
+            ...current,
+            eventId,
+            trackId: nextEvent?.tracks?.[0]?.id || '',
+        }));
     };
 
-    // 2. Hàm xử lý Tạo đội mới
     const handleCreateTeam = async (e) => {
         e.preventDefault();
-        setLoadingCreate(true);
         setError('');
+
+        if (!formData.eventId || !formData.trackId) {
+            setError('Vui lòng chọn giải đấu và hạng mục thi từ dữ liệu backend.');
+            return;
+        }
+
         try {
-            await axiosClient.post('/teams/create', formData);
-            alert('🎉 Tạo đội thành công!');
-            window.location.reload(); // Reload lại để load giao diện quản lý đội
+            setCreating(true);
+            const payload = {
+                ...formData,
+                eventId: Number(formData.eventId),
+                trackId: Number(formData.trackId),
+                joinPassword: formData.type === 'PRIVATE' ? formData.joinPassword : '',
+            };
+            const response = await axiosClient.post('/teams/create', payload);
+            localStorage.setItem('role', 'LEADER');
+            setTeam(response.result);
         } catch (err) {
-            setError(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi tạo đội. Tên đội có thể đã tồn tại!');
+            setError(err.message || 'Không thể tạo đội thi.');
         } finally {
-            setLoadingCreate(false);
+            setCreating(false);
         }
     };
 
-    // 3. Hàm xử lý Xóa thành viên (Dành cho Leader)
-    const handleRemoveMember = async (memberId, memberName) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn xóa ${memberName} khỏi đội?`)) return;
-        try {
-            await axiosClient.delete(`/teams/${team.id}/members/${memberId}`);
-            alert('Đã xóa thành viên thành công!');
-            fetchMyTeam(); // Tải lại danh sách
-        } catch (err) {
-            alert('Lỗi khi xóa thành viên: ' + (err.response?.data?.message || err.message));
-        }
-    };
+    if (loading) {
+        return <div className="rounded-lg bg-white p-8 text-center text-gray-500">Đang tải dữ liệu đội thi...</div>;
+    }
 
-    if (loadingTeam) return <div className="p-8 text-center text-gray-500">Đang kiểm tra dữ liệu đội thi...</div>;
-
-    // ==========================================
-    // GIAO DIỆN 1: NẾU ĐÃ CÓ ĐỘI -> HIỆN QUẢN LÝ
-    // ==========================================
     if (team) {
         return (
-            <div className="max-w-4xl mx-auto space-y-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex justify-between items-start">
-                    <div>
-                        <div className="flex items-center space-x-3 mb-2">
-                            <h2 className="text-2xl font-bold text-gray-900">{team.name}</h2>
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${
-                                team.type === 'PUBLIC' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}>
-                                {team.type === 'PUBLIC' ? '🌍 Public' : '🔒 Private'}
-                            </span>
+            <div className="mx-auto max-w-5xl space-y-6">
+                <div className="rounded-lg border border-blue-100 bg-white p-6 shadow-sm">
+                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                        <div>
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">
+                                {team.eventName || 'Chưa gắn giải đấu'}
+                            </p>
+                            <h2 className="mt-2 text-2xl font-black uppercase tracking-wide text-slate-900">
+                                {team.name}
+                            </h2>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Hạng mục: <span className="font-bold text-blue-700">{team.trackName || 'Chưa cập nhật'}</span>
+                            </p>
                         </div>
-                        <p className="text-gray-600 font-medium">Hạng mục thi (Track): <span className="text-indigo-600">{team.trackName || team.trackId || 'Chưa cập nhật'}</span></p>
+                        <span className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-black uppercase text-blue-700">
+                            {team.type}
+                        </span>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="p-5 border-b border-gray-200 bg-gray-50">
-                        <h3 className="text-lg font-bold text-gray-800">👥 Thành viên ({team.members?.length || 1}/4)</h3>
+                <div className="rounded-lg border border-blue-100 bg-white shadow-sm">
+                    <div className="border-b border-blue-100 bg-blue-50 px-6 py-4">
+                        <h3 className="font-black uppercase tracking-wide text-slate-900">
+                            Thành viên ({team.memberCount || team.members?.length || 0})
+                        </h3>
                     </div>
-                    <ul className="divide-y divide-gray-100">
-                        {team.members?.map((member) => (
-                            <li key={member.id} className="p-5 flex justify-between items-center hover:bg-gray-50">
+                    <div className="divide-y divide-blue-50">
+                        {(team.members || []).map((member) => (
+                            <div key={member.id} className="flex items-center justify-between px-6 py-4">
                                 <div>
-                                    <p className="font-semibold text-gray-900">{member.name || member.email}</p>
-                                    <p className="text-sm text-gray-500">{member.role === 'LEADER' ? '👑 Đội trưởng' : 'Thành viên'}</p>
+                                    <p className="font-bold text-slate-900">{member.fullName || member.email}</p>
+                                    <p className="text-sm text-slate-500">
+                                        {member.email} {member.studentId ? `- ${member.studentId}` : ''}
+                                    </p>
                                 </div>
-                                {role === 'LEADER' && member.role !== 'LEADER' && (
-                                    <button
-                                        onClick={() => handleRemoveMember(member.id, member.email)}
-                                        className="px-3 py-1.5 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
-                                    >
-                                        Xóa
-                                    </button>
-                                )}
-                            </li>
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                                    {member.role}
+                                </span>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                    <Link to="/dashboard/submissions" className="btn-primary">Nộp bài</Link>
+                    <Link to="/dashboard/teams" className="btn-secondary">Xem sảnh đội</Link>
                 </div>
             </div>
         );
     }
 
-    // ==========================================
-    // GIAO DIỆN 2: CHƯA CÓ ĐỘI -> HIỆN FORM TẠO
-    // ==========================================
     return (
-        <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Đăng ký Đội Thi Mới</h2>
-            <p className="text-sm text-gray-500 mb-6">Trở thành Team Leader và mời các thành viên khác gia nhập đội của bạn.</p>
+        <div className="mx-auto max-w-3xl rounded-lg border border-blue-100 bg-white p-8 shadow-sm">
+            <div className="mb-7">
+                <h2 className="text-2xl font-black uppercase tracking-wide text-slate-900">Tạo đội thi</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Đội sẽ được lưu vào bảng Team và gắn trực tiếp với Hackathon Event cùng Track đã chọn.
+                </p>
+            </div>
 
-            {error && <div className="mb-6 p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100">{error}</div>}
-
-            <form onSubmit={handleCreateTeam} className="space-y-5">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên Đội Thi</label>
-                    <input
-                        type="text" required placeholder="Nhập tên đội của bạn..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50"
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    />
+            {error && (
+                <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                    {error}
                 </div>
+            )}
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hạng Mục (Track)</label>
-                    <select
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50"
-                        value={formData.trackId}
-                        onChange={(e) => setFormData({...formData, trackId: Number(e.target.value)})}
-                    >
-                        <option value={1}>Ứng dụng AI</option>
-                        <option value={2}>Phát triển Web/App</option>
-                        <option value={3}>Thiết bị đeo thông minh & Cảm biến (Wearables/IoT)</option>
-                    </select>
+            {events.length === 0 ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+                    Chưa có giải đấu trong database. Coordinator cần tạo giải đấu trước khi thí sinh tạo đội.
                 </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Chế độ đội thi</label>
-                    <div className="flex space-x-6 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <label className="flex items-center cursor-pointer">
-                            <input type="radio" className="w-4 h-4 text-indigo-600" value="PUBLIC"
-                                   checked={formData.type === 'PUBLIC'}
-                                   onChange={(e) => setFormData({...formData, type: e.target.value})} />
-                            <span className="ml-2 text-sm text-gray-700">Công khai</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                            <input type="radio" className="w-4 h-4 text-indigo-600" value="PRIVATE"
-                                   checked={formData.type === 'PRIVATE'}
-                                   onChange={(e) => setFormData({...formData, type: e.target.value})} />
-                            <span className="ml-2 text-sm text-gray-700">Riêng tư</span>
-                        </label>
-                    </div>
-                </div>
-
-                {formData.type === 'PRIVATE' && (
-                    <div className="animate-fade-in-down">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu gia nhập</label>
+            ) : (
+                <form onSubmit={handleCreateTeam} className="space-y-5">
+                    <div>
+                        <label className="mb-1 block text-sm font-bold text-slate-700">Tên đội</label>
                         <input
-                            type="text" required placeholder="Thiết lập mật khẩu..."
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50"
-                            value={formData.joinPassword}
-                            onChange={(e) => setFormData({...formData, joinPassword: e.target.value})}
+                            required
+                            className="input-custom"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            placeholder="Nhập tên đội thi"
                         />
                     </div>
-                )}
 
-                <div className="pt-2">
-                    <button
-                        type="submit" disabled={loadingCreate}
-                        className="w-full px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all"
-                    >
-                        {loadingCreate ? 'Đang khởi tạo...' : 'Xác Nhận Tạo Đội'}
+                    <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Giải đấu</label>
+                            <select
+                                required
+                                className="input-custom"
+                                value={formData.eventId}
+                                onChange={(e) => handleEventChange(e.target.value)}
+                            >
+                                {events.map((event) => (
+                                    <option key={event.id} value={event.id}>
+                                        {event.name} - {event.season} {event.year}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Hạng mục</label>
+                            <select
+                                required
+                                className="input-custom"
+                                value={formData.trackId}
+                                onChange={(e) => setFormData({ ...formData, trackId: e.target.value })}
+                            >
+                                {(selectedEvent?.tracks || []).map((track) => (
+                                    <option key={track.id} value={track.id}>{track.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-sm font-bold text-slate-700">Chế độ đội</label>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {['PUBLIC', 'PRIVATE'].map((type) => (
+                                <label key={type} className="flex cursor-pointer items-center gap-3 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+                                    <input
+                                        type="radio"
+                                        value={type}
+                                        checked={formData.type === type}
+                                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                    />
+                                    <span className="font-bold text-slate-800">{type === 'PUBLIC' ? 'Công khai' : 'Riêng tư'}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    {formData.type === 'PRIVATE' && (
+                        <div>
+                            <label className="mb-1 block text-sm font-bold text-slate-700">Mật khẩu gia nhập</label>
+                            <input
+                                required
+                                className="input-custom"
+                                value={formData.joinPassword}
+                                onChange={(e) => setFormData({ ...formData, joinPassword: e.target.value })}
+                                placeholder="Mật khẩu dành cho thành viên được mời"
+                            />
+                        </div>
+                    )}
+
+                    <button type="submit" disabled={creating} className="btn-primary w-full">
+                        {creating ? 'Đang tạo đội...' : 'Tạo đội thi'}
                     </button>
-                </div>
-            </form>
+                </form>
+            )}
         </div>
     );
 }
