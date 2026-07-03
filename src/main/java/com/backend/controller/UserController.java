@@ -1,11 +1,14 @@
 package com.backend.controller;
 
+import com.backend.dto.response.UserProfileResponse;
 import com.backend.entity.User;
 import com.backend.entity.enums.AccountStatus;
 import com.backend.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -14,40 +17,96 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "*") // Đảm bảo không bị chặn CORS khi gọi PUT/GET
+@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    // 1. API lấy danh sách người dùng cho giao diện Quản lý
+    @GetMapping("/me")
+    public ResponseEntity<Map<String, Object>> getCurrentUser() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("result", toProfile(getAuthenticatedUser()));
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/me/profile")
+    public ResponseEntity<Map<String, Object>> updateProfile(@RequestBody Map<String, String> body) {
+        User user = getAuthenticatedUser();
+        if (body.containsKey("avatarUrl")) {
+            user.setAvatarUrl(body.get("avatarUrl"));
+        }
+        userRepository.save(user);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("result", toProfile(user));
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<Map<String, Object>> changePassword(@RequestBody Map<String, String> body) {
+        User user = getAuthenticatedUser();
+        String oldPassword = body.get("oldPassword");
+        String newPassword = body.get("newPassword");
+
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new RuntimeException("Mật khẩu hiện tại không đúng");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("result", "Cập nhật mật khẩu thành công");
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> getAllUsers() {
         List<User> users = userRepository.findAll();
 
         Map<String, Object> response = new HashMap<>();
-        response.put("result", users); // Trả về bọc trong object "result" để khớp với Frontend
+        response.put("result", users);
         return ResponseEntity.ok(response);
     }
 
-    // 2. API Cập nhật trạng thái duyệt (Duyệt/Từ chối)
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> updateStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
 
-        // Tìm user, nếu không có thì ném lỗi
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản!"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
 
-        // Cập nhật trạng thái thành APPROVED hoặc REJECTED
         user.setStatus(AccountStatus.valueOf(body.get("status")));
         userRepository.save(user);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("result", "Cập nhật trạng thái thành công!");
+        response.put("result", "Cập nhật trạng thái thành công");
         return ResponseEntity.ok(response);
+    }
+
+    private User getAuthenticatedUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+    }
+
+    private UserProfileResponse toProfile(User user) {
+        return UserProfileResponse.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .studentId(user.getStudentId())
+                .fptStudent(user.isFptStudent())
+                .universityName(user.getUniversityName())
+                .avatarUrl(user.getAvatarUrl())
+                .studentCardUrl(user.getStudentCardUrl())
+                .role(user.getRole())
+                .status(user.getStatus())
+                .build();
     }
 }

@@ -3,7 +3,7 @@ package com.backend.controller;
 import com.backend.dto.request.JoinPrivateRequest;
 import com.backend.dto.request.TeamCreateRequest;
 import com.backend.dto.response.ApiResponse;
-import com.backend.entity.Team;
+import com.backend.dto.response.TeamResponse;
 import com.backend.service.TeamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,23 +21,23 @@ public class TeamController {
 
     @PostMapping("/create")
     @PreAuthorize("hasRole('MEMBER') or hasRole('LEADER')")
-    public ApiResponse<Team> createTeam(@RequestBody TeamCreateRequest request) {
-        return ApiResponse.<Team>builder()
+    public ApiResponse<TeamResponse> createTeam(@RequestBody TeamCreateRequest request) {
+        return ApiResponse.<TeamResponse>builder()
                 .result(teamService.createTeam(request))
                 .build();
     }
 
     @GetMapping
-    public ApiResponse<List<Team>> getAllTeams() {
-        return ApiResponse.<List<Team>>builder()
+    public ApiResponse<List<TeamResponse>> getAllTeams() {
+        return ApiResponse.<List<TeamResponse>>builder()
                 .result(teamService.getAllTeams())
                 .build();
     }
 
     @GetMapping("/my-team")
     @PreAuthorize("hasAnyRole('LEADER', 'MEMBER')")
-    public ApiResponse<Team> getMyTeam() {
-        return ApiResponse.<Team>builder()
+    public ApiResponse<TeamResponse> getMyTeam() {
+        return ApiResponse.<TeamResponse>builder()
                 .result(teamService.getMyTeam())
                 .build();
     }
