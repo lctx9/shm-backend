@@ -18,7 +18,9 @@ public class AuthController {
 
     @PostMapping("/register")
     public ApiResponse<String> register(@RequestBody @Valid RegisterRequest request) {
+        // Gọi service xử lý luồng tích hợp OTP
         String result = authService.register(request);
+
         return ApiResponse.<String>builder()
                 .result(result)
                 .build();
