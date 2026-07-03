@@ -20,6 +20,7 @@ public class UserController {
     @Autowired
     private UserRepository userRepository;
 
+    // 1. API lấy danh sách người dùng cho giao diện Quản lý
     @GetMapping
     @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> getAllUsers() {
