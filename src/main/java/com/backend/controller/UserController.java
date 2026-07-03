@@ -1,8 +1,10 @@
 package com.backend.controller;
 
+import com.backend.dto.request.StaffCreateRequest;
 import com.backend.dto.response.UserProfileResponse;
 import com.backend.entity.User;
 import com.backend.entity.enums.AccountStatus;
+import com.backend.entity.enums.RoleType;
 import com.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,41 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> getCurrentUser() {
         Map<String, Object> response = new HashMap<>();
         response.put("result", toProfile(getAuthenticatedUser()));
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/role/{role}")
+    @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> getUsersByRole(@PathVariable RoleType role) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("result", userRepository.findByRole(role).stream().map(this::toProfile).toList());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/staff")
+    @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> createStaff(@RequestBody StaffCreateRequest request) {
+        if (request.getRole() != RoleType.MENTOR && request.getRole() != RoleType.JUDGE && request.getRole() != RoleType.COORDINATOR) {
+            throw new RuntimeException("Chỉ được tạo tài khoản MENTOR, JUDGE hoặc COORDINATOR tại đây");
+        }
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email đã tồn tại");
+        }
+
+        User user = User.builder()
+                .fullName(request.getFullName())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(request.getRole())
+                .status(AccountStatus.APPROVED)
+                .isFptStudent(false)
+                .universityName("FPT University")
+                .build();
+        userRepository.save(user);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("result", toProfile(user));
         return ResponseEntity.ok(response);
     }
 
