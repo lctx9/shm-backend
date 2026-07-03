@@ -1,4 +1,6 @@
 .idea/
+shm-backend/
+shm-frontend/
 HELP.md
 target/
 .mvn/wrapper/maven-wrapper.jar
