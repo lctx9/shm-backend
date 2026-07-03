@@ -21,5 +21,6 @@ public class SubmissionResponse {
     private String flagReason;
     private Double score;
     private String feedback;
+    private String criteriaScoresJson;
     private Boolean graded;
 }

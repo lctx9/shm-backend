@@ -16,6 +16,9 @@ public class Team extends BaseEntity {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(length = 1000)
+    private String description;
+
     @Enumerated(EnumType.STRING)
     private TeamType type;
 

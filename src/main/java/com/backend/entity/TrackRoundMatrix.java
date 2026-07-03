@@ -25,6 +25,9 @@ public class TrackRoundMatrix extends BaseEntity {
     private String guidelineUrl;
     private LocalDateTime submissionDeadline;
 
+    @Column(columnDefinition = "TEXT")
+    private String scoringCriteriaJson;
+
     @ManyToMany
     @JoinTable(
             name = "matrix_mentors",

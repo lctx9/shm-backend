@@ -17,4 +17,8 @@ public class EventRequest {
     private List<String> tracks;
     private Integer roundCount;
     private LocalDateTime submissionDeadline;
+    private String submissionFormSchema;
+    private String competitionRules;
+    private String ruleDocumentUrl;
+    private Boolean active;
 }

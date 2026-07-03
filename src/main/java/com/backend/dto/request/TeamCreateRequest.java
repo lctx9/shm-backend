@@ -6,6 +6,7 @@ import lombok.Data;
 @Data
 public class TeamCreateRequest {
     private String name;
+    private String description;
     private TeamType type; // PUBLIC hoặc PRIVATE
     private String joinPassword; // Mật khẩu nếu là PRIVATE
     private Long trackId; // ID của hạng mục tham gia

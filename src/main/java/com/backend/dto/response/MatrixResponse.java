@@ -21,6 +21,7 @@ public class MatrixResponse {
     private Integer roundOrder;
     private String guidelineUrl;
     private LocalDateTime submissionDeadline;
+    private String scoringCriteriaJson;
     private List<UserProfileResponse> mentors;
     private List<UserProfileResponse> judges;
 }

@@ -23,5 +23,8 @@ public class Score extends BaseEntity {
     private Double scoreValue;
 
     @Column(columnDefinition = "TEXT")
+    private String criteriaScoresJson;
+
+    @Column(columnDefinition = "TEXT")
     private String comment;
 }

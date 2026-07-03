@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface PrizeRepository extends JpaRepository<Prize, Long> {
     List<Prize> findByEventId(Long eventId);
+    List<Prize> findByTeamId(Long teamId);
 }

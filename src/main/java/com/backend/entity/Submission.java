@@ -33,6 +33,9 @@ public class Submission extends BaseEntity {
     @Column(name = "feedback", columnDefinition = "TEXT")
     private String feedback; // Lời nhận xét
 
+    @Column(name = "criteria_scores_json", columnDefinition = "TEXT")
+    private String criteriaScoresJson;
+
     @Column(name = "is_graded")
     private Boolean isGraded = false; // Trạng thái: Đã chấm hay chưa
 

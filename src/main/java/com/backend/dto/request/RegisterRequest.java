@@ -20,5 +20,5 @@ public class RegisterRequest {
     private boolean isFptStudent;
     private String universityName;
     private String studentCardUrl;
-    private String otp; // Nhận mã OTP để xác thực (Sẽ xử lý logic gửi mail sau)
+    private String otp;
 }

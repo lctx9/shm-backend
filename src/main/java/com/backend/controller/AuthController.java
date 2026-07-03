@@ -1,6 +1,7 @@
 package com.backend.controller;
 
 import com.backend.dto.request.LoginRequest;
+import com.backend.dto.request.OtpRequest;
 import com.backend.dto.request.RegisterRequest;
 import com.backend.dto.response.ApiResponse;
 import com.backend.dto.response.AuthResponse;
@@ -16,21 +17,24 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @PostMapping("/send-otp")
+    public ApiResponse<String> sendOtp(@RequestBody @Valid OtpRequest request) {
+        return ApiResponse.<String>builder()
+                .result(authService.sendRegistrationOtp(request.getEmail()))
+                .build();
+    }
+
     @PostMapping("/register")
     public ApiResponse<String> register(@RequestBody @Valid RegisterRequest request) {
-        // Gọi service xử lý luồng tích hợp OTP
-        String result = authService.register(request);
-
         return ApiResponse.<String>builder()
-                .result(result)
+                .result(authService.register(request))
                 .build();
     }
 
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@RequestBody @Valid LoginRequest request) {
-        AuthResponse response = authService.login(request);
         return ApiResponse.<AuthResponse>builder()
-                .result(response)
+                .result(authService.login(request))
                 .build();
     }
 }

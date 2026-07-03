@@ -31,7 +31,9 @@ public class User extends BaseEntity {
 
     private String avatarUrl;
 
+    @Column(columnDefinition = "TEXT")
     private String studentCardUrl;
+    private String rejectionReason;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

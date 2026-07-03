@@ -9,16 +9,11 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class LeaderboardResponse {
+public class AchievementResponse {
     private Long id;
-    private Integer rank;
-    private Long eventId;
+    private String prizeName;
     private String eventName;
     private Integer eventYear;
     private String teamName;
-    private String track;
-    private String projectName;
     private String description;
-    private Double score;
-    private java.util.List<TeamMemberResponse> members;
 }

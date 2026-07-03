@@ -52,25 +52,89 @@ public class EventService {
                 .regEndDate(request.getRegEndDate())
                 .eventStartDate(request.getEventStartDate())
                 .eventEndDate(request.getEventEndDate())
+                .defaultSubmissionDeadline(request.getSubmissionDeadline())
+                .roundCount(request.getRoundCount() == null || request.getRoundCount() < 1 ? 1 : request.getRoundCount())
+                .structureInitialized(false)
+                .submissionFormSchema(request.getSubmissionFormSchema())
+                .competitionRules(request.getCompetitionRules())
+                .ruleDocumentUrl(request.getRuleDocumentUrl())
                 .isActive(true)
                 .build();
 
         HackathonEvent savedEvent = eventRepository.save(newEvent);
 
-        List<Track> tracks = safeTrackNames(request).stream()
-                .map(name -> trackRepository.save(Track.builder()
-                        .name(name.trim())
-                        .description("")
-                        .event(savedEvent)
-                        .build()))
-                .toList();
+        safeTrackNames(request).forEach(name -> trackRepository.save(Track.builder()
+                .name(name.trim())
+                .description("")
+                .event(savedEvent)
+                .build()));
 
-        int roundCount = request.getRoundCount() == null || request.getRoundCount() < 1 ? 1 : request.getRoundCount();
+        return getEvent(savedEvent.getId());
+    }
+
+    @Transactional
+    public EventResponse updateEvent(Long eventId, EventRequest request) {
+        HackathonEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("KhÃ´ng tÃ¬m tháº¥y giáº£i Ä‘áº¥u"));
+
+        event.setName(request.getName());
+        event.setSeason(request.getSeason());
+        event.setYear(request.getYear());
+        event.setRegStartDate(request.getRegStartDate());
+        event.setRegEndDate(request.getRegEndDate());
+        event.setEventStartDate(request.getEventStartDate());
+        event.setEventEndDate(request.getEventEndDate());
+        event.setDefaultSubmissionDeadline(request.getSubmissionDeadline());
+        event.setRoundCount(request.getRoundCount() == null || request.getRoundCount() < 1 ? 1 : request.getRoundCount());
+        event.setSubmissionFormSchema(request.getSubmissionFormSchema());
+        event.setCompetitionRules(request.getCompetitionRules());
+        event.setRuleDocumentUrl(request.getRuleDocumentUrl());
+        if (request.getActive() != null) {
+            event.setActive(request.getActive());
+        }
+
+        boolean hasStructure = Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByTrackEventId(eventId) > 0;
+        if (!hasStructure && request.getTracks() != null) {
+            trackRepository.deleteAll(trackRepository.findByEventId(eventId));
+            safeTrackNames(request).forEach(name -> trackRepository.save(Track.builder()
+                    .name(name.trim())
+                    .description("")
+                    .event(event)
+                    .build()));
+        }
+
+        eventRepository.save(event);
+        return getEvent(eventId);
+    }
+
+    @Transactional
+    public void deleteEvent(Long eventId) {
+        HackathonEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("KhÃ´ng tÃ¬m tháº¥y giáº£i Ä‘áº¥u"));
+        event.setActive(false);
+        eventRepository.save(event);
+    }
+
+    @Transactional
+    public EventResponse initializeStructure(Long eventId) {
+        HackathonEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
+
+        if (Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByTrackEventId(eventId) > 0) {
+            throw new RuntimeException("Cấu trúc trận đấu đã được khởi tạo");
+        }
+
+        List<Track> tracks = trackRepository.findByEventId(eventId);
+        if (tracks.isEmpty()) {
+            throw new RuntimeException("Giải đấu chưa có track để khởi tạo ma trận");
+        }
+
+        int roundCount = event.getRoundCount() == null || event.getRoundCount() < 1 ? 1 : event.getRoundCount();
         List<Round> rounds = java.util.stream.IntStream.rangeClosed(1, roundCount)
                 .mapToObj(index -> roundRepository.save(Round.builder()
                         .name("Vòng " + index)
                         .orderIndex(index)
-                        .event(savedEvent)
+                        .event(event)
                         .build()))
                 .toList();
 
@@ -79,12 +143,14 @@ public class EventService {
                 matrixRepository.save(TrackRoundMatrix.builder()
                         .track(track)
                         .round(round)
-                        .submissionDeadline(request.getSubmissionDeadline())
+                        .submissionDeadline(event.getDefaultSubmissionDeadline())
                         .build());
             }
         }
 
-        return getEvent(savedEvent.getId());
+        event.setStructureInitialized(true);
+        eventRepository.save(event);
+        return getEvent(eventId);
     }
 
     public List<EventResponse> getEvents() {
@@ -118,6 +184,7 @@ public class EventService {
 
         matrix.setGuidelineUrl(request.getGuidelineUrl());
         matrix.setSubmissionDeadline(request.getSubmissionDeadline());
+        matrix.setScoringCriteriaJson(request.getScoringCriteriaJson());
 
         if (request.getMentorIds() != null) {
             matrix.setMentors(request.getMentorIds().stream()
@@ -154,6 +221,24 @@ public class EventService {
         return toPrizeResponse(prizeRepository.save(prize));
     }
 
+    @Transactional
+    public PrizeResponse updatePrize(Long prizeId, PrizeRequest request) {
+        Prize prize = prizeRepository.findById(prizeId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giải thưởng"));
+        Team team = request.getTeamId() == null ? null : teamRepository.findById(request.getTeamId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đội nhận giải"));
+
+        prize.setName(request.getName());
+        prize.setDescription(request.getDescription());
+        prize.setTeam(team);
+        return toPrizeResponse(prizeRepository.save(prize));
+    }
+
+    @Transactional
+    public void deletePrize(Long prizeId) {
+        prizeRepository.deleteById(prizeId);
+    }
+
     private EventResponse toEventResponse(HackathonEvent event) {
         List<TrackResponse> tracks = trackRepository.findByEventId(event.getId()).stream()
                 .map(this::toTrackResponse)
@@ -177,7 +262,13 @@ public class EventService {
                 .regEndDate(event.getRegEndDate())
                 .eventStartDate(event.getEventStartDate())
                 .eventEndDate(event.getEventEndDate())
+                .defaultSubmissionDeadline(event.getDefaultSubmissionDeadline())
+                .roundCount(event.getRoundCount())
+                .structureInitialized(Boolean.TRUE.equals(event.getStructureInitialized()) || !matrices.isEmpty())
                 .active(event.isActive())
+                .submissionFormSchema(event.getSubmissionFormSchema())
+                .competitionRules(event.getCompetitionRules())
+                .ruleDocumentUrl(event.getRuleDocumentUrl())
                 .teamCount(teamRepository.countByEventId(event.getId()))
                 .tracks(tracks)
                 .rounds(rounds)
@@ -211,6 +302,7 @@ public class EventService {
                 .roundOrder(matrix.getRound().getOrderIndex())
                 .guidelineUrl(matrix.getGuidelineUrl())
                 .submissionDeadline(matrix.getSubmissionDeadline())
+                .scoringCriteriaJson(matrix.getScoringCriteriaJson())
                 .mentors(matrix.getMentors() == null ? List.of() : matrix.getMentors().stream().map(this::toUserProfile).toList())
                 .judges(matrix.getJudges() == null ? List.of() : matrix.getJudges().stream().map(this::toUserProfile).toList())
                 .build();

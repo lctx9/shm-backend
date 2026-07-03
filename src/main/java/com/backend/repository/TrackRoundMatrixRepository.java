@@ -10,4 +10,5 @@ import java.util.List;
 public interface TrackRoundMatrixRepository extends JpaRepository<TrackRoundMatrix, Long> {
     List<TrackRoundMatrix> findByTrackEventId(Long eventId);
     List<TrackRoundMatrix> findByTrackId(Long trackId);
+    long countByTrackEventId(Long eventId);
 }

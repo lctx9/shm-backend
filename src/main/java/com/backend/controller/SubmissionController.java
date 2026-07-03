@@ -47,7 +47,7 @@ public class SubmissionController {
 
     // 1. API Lấy toàn bộ bài nộp cho Giám khảo xem
     @GetMapping
-    @PreAuthorize("hasAnyRole('JUDGE', 'ADMIN', 'COORDINATOR')")
+    @PreAuthorize("hasAnyRole('JUDGE', 'MENTOR', 'ADMIN', 'COORDINATOR')")
     public ApiResponse<List<SubmissionResponse>> getAllSubmissions() {
         return ApiResponse.<List<SubmissionResponse>>builder()
                 .result(submissionService.getAllSubmissions())

@@ -74,11 +74,53 @@ public class EventController {
                 .build();
     }
 
+    @PutMapping("/prizes/{prizeId}")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    public ApiResponse<PrizeResponse> updatePrize(@PathVariable Long prizeId, @RequestBody PrizeRequest request) {
+        return ApiResponse.<PrizeResponse>builder()
+                .result(eventService.updatePrize(prizeId, request))
+                .build();
+    }
+
+    @DeleteMapping("/prizes/{prizeId}")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    public ApiResponse<String> deletePrize(@PathVariable Long prizeId) {
+        eventService.deletePrize(prizeId);
+        return ApiResponse.<String>builder()
+                .result("Đã xoá giải thưởng")
+                .build();
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
     public ApiResponse<EventResponse> createEvent(@RequestBody EventRequest request) {
         return ApiResponse.<EventResponse>builder()
                 .result(eventService.createEvent(request))
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    public ApiResponse<EventResponse> updateEvent(@PathVariable Long id, @RequestBody EventRequest request) {
+        return ApiResponse.<EventResponse>builder()
+                .result(eventService.updateEvent(id, request))
+                .build();
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    public ApiResponse<String> deleteEvent(@PathVariable Long id) {
+        eventService.deleteEvent(id);
+        return ApiResponse.<String>builder()
+                .result("Event da duoc tat hoat dong")
+                .build();
+    }
+
+    @PostMapping("/{id}/initialize-structure")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    public ApiResponse<EventResponse> initializeStructure(@PathVariable Long id) {
+        return ApiResponse.<EventResponse>builder()
+                .result(eventService.initializeStructure(id))
                 .build();
     }
 }

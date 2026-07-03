@@ -75,6 +75,7 @@ public class SubmissionService {
         submission.setIsGraded(false);
         submission.setScore(null);
         submission.setFeedback(null);
+        submission.setCriteriaScoresJson(null);
 
         return toSubmissionResponse(submissionRepository.save(submission));
     }
@@ -119,6 +120,7 @@ public class SubmissionService {
                 .flagReason(submission.getFlagReason())
                 .score(submission.getScore())
                 .feedback(submission.getFeedback())
+                .criteriaScoresJson(submission.getCriteriaScoresJson())
                 .graded(submission.getIsGraded())
                 .build();
     }

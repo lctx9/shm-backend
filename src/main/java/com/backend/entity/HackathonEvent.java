@@ -26,6 +26,18 @@ public class HackathonEvent extends BaseEntity {
     private LocalDateTime regEndDate;
     private LocalDateTime eventStartDate;
     private LocalDateTime eventEndDate;
+    private LocalDateTime defaultSubmissionDeadline;
+
+    private Integer roundCount;
+    private Boolean structureInitialized = false;
+
+    @Column(columnDefinition = "TEXT")
+    private String submissionFormSchema;
+
+    @Column(columnDefinition = "TEXT")
+    private String competitionRules;
+
+    private String ruleDocumentUrl;
 
     private boolean isActive = true;
 }

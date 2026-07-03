@@ -15,6 +15,7 @@ import java.util.List;
 public class TeamResponse {
     private Long id;
     private String name;
+    private String description;
     private TeamType type;
     private Long eventId;
     private String eventName;

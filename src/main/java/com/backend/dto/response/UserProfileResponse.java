@@ -20,6 +20,7 @@ public class UserProfileResponse {
     private String universityName;
     private String avatarUrl;
     private String studentCardUrl;
+    private String rejectionReason;
     private RoleType role;
     private AccountStatus status;
 }
