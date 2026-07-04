@@ -64,6 +64,36 @@ INSERT INTO events (
 5. Moi lan sua diem phai co ly do de luu audit log.$$,
     'https://example.com/seal/rules-spring-2026.pdf',
     true
+),
+(
+    2, now(), now(), 'SEAL Hackathon Fall 2025', 'FALL', 2025,
+    '2025-09-01 08:00:00', '2025-09-15 23:59:00',
+    '2025-09-20 08:00:00', '2025-09-28 18:00:00',
+    '2025-09-26 23:59:00', 2, true,
+    $$[
+      {"id":"projectName","label":"Ten du an","type":"text","required":true},
+      {"id":"repoUrl","label":"Link source code","type":"url","required":true},
+      {"id":"demoUrl","label":"Link demo","type":"url","required":true}
+    ]$$,
+    $$1. Moi doi co 2-5 thanh vien.
+2. San pham can co demo hoat dong.
+3. Ket qua duoc cong bo sau vong final pitch.$$,
+    'https://example.com/seal/rules-fall-2025.pdf',
+    false
+),
+(
+    3, now(), now(), 'SEAL Hackathon Spring 2025', 'SPRING', 2025,
+    '2025-03-01 08:00:00', '2025-03-12 23:59:00',
+    '2025-03-18 08:00:00', '2025-03-25 18:00:00',
+    '2025-03-23 23:59:00', 2, true,
+    $$[
+      {"id":"projectName","label":"Ten du an","type":"text","required":true},
+      {"id":"pitchDeck","label":"Pitch deck","type":"url","required":true}
+    ]$$,
+    $$1. Giai phap can bam sat chu de hoc duong so.
+2. Diem final gom san pham, tac dong va kha nang trinh bay.$$,
+    'https://example.com/seal/rules-spring-2025.pdf',
+    false
 );
 
 INSERT INTO tracks (id, created_at, updated_at, name, description, event_id) VALUES
@@ -155,9 +185,13 @@ INSERT INTO scores (
      'Prototype tot, can lam ro hon phan scale va monitoring.');
 
 INSERT INTO prizes (id, created_at, updated_at, name, description, event_id, team_id) VALUES
-    (1, now(), now(), 'First Prize', '10,000,000 VND va goi mentoring 3 thang', 1, null),
-    (2, now(), now(), 'Innovation Prize', 'Danh cho y tuong sang tao nhat', 1, null),
-    (3, now(), now(), 'Best Presentation', 'Danh cho phan pitch thuyet phuc nhat', 1, null);
+    (1, now(), now(), 'First Prize', '10,000,000 VND va goi mentoring 3 thang', 1, 2),
+    (2, now(), now(), 'Innovation Prize', 'Danh cho y tuong sang tao nhat', 1, 1),
+    (3, now(), now(), 'Best Presentation', 'Danh cho phan pitch thuyet phuc nhat', 1, 1),
+    (4, now(), now(), 'Second Prize', 'Giai nhi SEAL Fall 2025 voi san pham lap lich hoc nhom thong minh', 2, 1),
+    (5, now(), now(), 'Community Impact Award', 'Du an duoc danh gia cao ve tac dong voi sinh vien nam nhat', 3, 1),
+    (6, now(), now(), 'AI Excellence Award', 'Giai ung dung AI co chat luong model va evaluation tot nhat', 2, 2),
+    (7, now(), now(), 'Best Product Demo', 'Demo san pham on dinh, flow ro va co kha nang trien khai', 3, 2);
 
 INSERT INTO notifications (
     id, created_at, updated_at, title, body, target_role, recipient_id, sender_id
@@ -242,6 +276,12 @@ INSERT INTO scores (
        {"id":"business","label":"Tinh ung dung","maxScore":100,"weight":20,"score":91,"note":"Co kha nang trien khai."}
      ]$$,
      'Ung dung AI ro gia tri, demo tot va co metric danh gia kha thuyet phuc.');
+
+INSERT INTO prizes (id, created_at, updated_at, name, description, event_id, team_id) VALUES
+    (8, now(), now(), 'Rising Team Award', 'Doi moi co workflow van hanh tot va kha nang cai tien nhanh qua tung vong', 1, 3),
+    (9, now(), now(), 'Operational Excellence', 'Du an dashboard noi bo co thiet ke checklist va audit flow ro rang', 2, 3),
+    (10, now(), now(), 'Third Prize', 'Giai ba cho giai phap AI mentor ho tro review pitch deck', 1, 4),
+    (11, now(), now(), 'Best AI Prototype', 'Prototype AI co trai nghiem san pham tot va output de giai thich', 3, 4);
 
 INSERT INTO chat_messages (id, created_at, updated_at, team_id, sender_id, content) VALUES
     (4, now(), now(), 3, 5, 'Gamma Flow, mentor da xem prototype. Hay them status filter cho submission monitor.'),
