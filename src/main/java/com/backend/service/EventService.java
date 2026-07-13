@@ -144,7 +144,7 @@ public class EventService {
                         .track(track)
                         .round(round)
                         .submissionDeadline(event.getDefaultSubmissionDeadline())
-                        .mentors(track.getMentors())
+                        .mentors(track.getMentors() == null ? new java.util.LinkedHashSet<>() : new java.util.LinkedHashSet<>(track.getMentors()))
                         .build());
             }
         }

@@ -24,7 +24,8 @@ public class GlobalExceptionHandler {
 
     // Bắt lỗi hệ thống (những lỗi không lường trước)
     @ExceptionHandler(value = Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handlingRuntimeException(RuntimeException exception) {
+    public ResponseEntity<ApiResponse<Void>> handlingRuntimeException(Exception exception) {
+        exception.printStackTrace(); // Log lỗi ra console để debug dễ dàng
         ApiResponse<Void> apiResponse = ApiResponse.<Void>builder()
                 .code(ErrorCode.UNCATEGORIZED_EXCEPTION.getCode())
                 .message(ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage())
