@@ -108,9 +108,35 @@ public class EventService {
     @Transactional
     public void deleteEvent(Long eventId) {
         HackathonEvent event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new RuntimeException("KhÃ´ng tÃ¬m tháº¥y giáº£i Ä‘áº¥u"));
-        event.setActive(false);
-        eventRepository.save(event);
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
+        
+        long teamCount = teamRepository.countByEventId(eventId);
+        if (teamCount > 0) {
+            event.setActive(false);
+            eventRepository.save(event);
+        } else {
+            List<Prize> prizes = prizeRepository.findByEventId(eventId);
+            if (prizes != null && !prizes.isEmpty()) {
+                prizeRepository.deleteAll(prizes);
+            }
+            
+            List<TrackRoundMatrix> matrices = matrixRepository.findByRoundEventId(eventId);
+            if (matrices != null && !matrices.isEmpty()) {
+                matrixRepository.deleteAll(matrices);
+            }
+            
+            List<Round> rounds = roundRepository.findByEventIdOrderByOrderIndexAsc(eventId);
+            if (rounds != null && !rounds.isEmpty()) {
+                roundRepository.deleteAll(rounds);
+            }
+            
+            List<Track> tracks = trackRepository.findByEventId(eventId);
+            if (tracks != null && !tracks.isEmpty()) {
+                trackRepository.deleteAll(tracks);
+            }
+            
+            eventRepository.delete(event);
+        }
     }
 
     @Transactional
