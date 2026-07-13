@@ -12,4 +12,5 @@ public class MatrixUpdateRequest {
     private String scoringCriteriaJson;
     private Set<Long> mentorIds;
     private Set<Long> judgeIds;
+    private Integer topN;
 }

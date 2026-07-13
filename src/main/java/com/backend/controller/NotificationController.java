@@ -4,15 +4,20 @@ import com.backend.dto.request.NotificationRequest;
 import com.backend.dto.response.ApiResponse;
 import com.backend.dto.response.NotificationResponse;
 import com.backend.entity.Notification;
+import com.backend.entity.NotificationRead;
 import com.backend.entity.User;
 import com.backend.repository.NotificationRepository;
+import com.backend.repository.NotificationReadRepository;
 import com.backend.repository.UserRepository;
+import com.backend.entity.enums.RoleType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/notifications")
@@ -21,15 +26,23 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationReadRepository notificationReadRepository;
     private final UserRepository userRepository;
 
     @GetMapping
     public ApiResponse<List<NotificationResponse>> getMyNotifications() {
         User currentUser = getCurrentUser();
-        List<NotificationResponse> rows = notificationRepository.findAll().stream()
+        List<Notification> visible = notificationRepository.findAllByOrderByCreatedAtDesc().stream()
                 .filter(item -> item.getRecipient() == null || item.getRecipient().getId().equals(currentUser.getId()))
-                .filter(item -> item.getTargetRole() == null || item.getTargetRole() == currentUser.getRole())
-                .map(this::toResponse)
+                .filter(item -> item.getTargetRole() == null
+                        || item.getTargetRole() == currentUser.getRole()
+                        || (isStaffRole(item.getTargetRole()) && isStaffRole(currentUser.getRole())))
+                .toList();
+        Set<Long> readIds = notificationReadRepository
+                .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList())
+                .stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
+        List<NotificationResponse> rows = visible.stream()
+                .map(item -> toResponse(item, readIds.contains(item.getId())))
                 .toList();
         return ApiResponse.<List<NotificationResponse>>builder().result(rows).build();
     }
@@ -49,8 +62,33 @@ public class NotificationController {
                 .build();
 
         return ApiResponse.<NotificationResponse>builder()
-                .result(toResponse(notificationRepository.save(notification)))
+                .result(toResponse(notificationRepository.save(notification), false))
                 .build();
+    }
+
+    @PatchMapping("/{id}/read")
+    public ApiResponse<String> markAsRead(@PathVariable Long id) {
+        User currentUser = getCurrentUser();
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông báo"));
+        if (!isVisibleTo(notification, currentUser)) {
+            throw new RuntimeException("Bạn không có quyền xem thông báo này");
+        }
+        if (!notificationReadRepository.existsByUserIdAndNotificationId(currentUser.getId(), id)) {
+            notificationReadRepository.save(NotificationRead.builder().notification(notification).user(currentUser).build());
+        }
+        return ApiResponse.<String>builder().result("Đã đánh dấu là đã đọc").build();
+    }
+
+    @PatchMapping("/read-all")
+    public ApiResponse<String> markAllAsRead() {
+        User currentUser = getCurrentUser();
+        notificationRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(item -> isVisibleTo(item, currentUser))
+                .filter(item -> !notificationReadRepository.existsByUserIdAndNotificationId(currentUser.getId(), item.getId()))
+                .map(item -> NotificationRead.builder().notification(item).user(currentUser).build())
+                .forEach(notificationReadRepository::save);
+        return ApiResponse.<String>builder().result("Đã đọc tất cả thông báo").build();
     }
 
     private User getCurrentUser() {
@@ -58,7 +96,7 @@ public class NotificationController {
         return userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
     }
 
-    private NotificationResponse toResponse(Notification notification) {
+    private NotificationResponse toResponse(Notification notification, boolean read) {
         return NotificationResponse.builder()
                 .id(notification.getId())
                 .title(notification.getTitle())
@@ -66,7 +104,20 @@ public class NotificationController {
                 .targetRole(notification.getTargetRole())
                 .recipientEmail(notification.getRecipient() == null ? null : notification.getRecipient().getEmail())
                 .senderEmail(notification.getSender() == null ? null : notification.getSender().getEmail())
+                .actionUrl(notification.getActionUrl())
+                .read(read)
                 .createdAt(notification.getCreatedAt())
                 .build();
+    }
+
+    private boolean isVisibleTo(Notification item, User user) {
+        boolean recipientMatches = item.getRecipient() == null || item.getRecipient().getId().equals(user.getId());
+        boolean roleMatches = item.getTargetRole() == null || item.getTargetRole() == user.getRole()
+                || (isStaffRole(item.getTargetRole()) && isStaffRole(user.getRole()));
+        return recipientMatches && roleMatches;
+    }
+
+    private boolean isStaffRole(RoleType role) {
+        return role == RoleType.STAFF || role == RoleType.MENTOR || role == RoleType.JUDGE;
     }
 }

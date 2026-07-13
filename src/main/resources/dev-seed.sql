@@ -30,10 +30,10 @@ INSERT INTO users (
 ) VALUES
     (1, now(), now(), 'Admin SEAL', 'admin@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'SEAL Organization', null, null, null, 'ADMIN', 'APPROVED'),
     (2, now(), now(), 'Coordinator Linh Nguyen', 'coordinator@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'FPT University', null, null, null, 'COORDINATOR', 'APPROVED'),
-    (3, now(), now(), 'Judge Minh Tran', 'judge1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'SEAL Partner', null, null, null, 'JUDGE', 'APPROVED'),
-    (4, now(), now(), 'Judge Hanh Pham', 'judge2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Tech Mentor Network', null, null, null, 'JUDGE', 'APPROVED'),
-    (5, now(), now(), 'Mentor Bao Vo', 'mentor1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Software Guild', null, null, null, 'MENTOR', 'APPROVED'),
-    (6, now(), now(), 'Mentor Nhi Le', 'mentor2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'AI Lab', null, null, null, 'MENTOR', 'APPROVED'),
+    (3, now(), now(), 'Staff Minh Tran', 'judge1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'SEAL Partner', null, null, null, 'STAFF', 'APPROVED'),
+    (4, now(), now(), 'Staff Hanh Pham', 'judge2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Tech Mentor Network', null, null, null, 'STAFF', 'APPROVED'),
+    (5, now(), now(), 'Staff Bao Vo', 'mentor1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Software Guild', null, null, null, 'STAFF', 'APPROVED'),
+    (6, now(), now(), 'Staff Nhi Le', 'mentor2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'AI Lab', null, null, null, 'STAFF', 'APPROVED'),
     (7, now(), now(), 'Leader An Nguyen', 'leader.alpha@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170001', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170001.png', null, 'LEADER', 'APPROVED'),
     (8, now(), now(), 'Member Binh Tran', 'member.alpha@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170002', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170002.png', null, 'MEMBER', 'APPROVED'),
     (9, now(), now(), 'Leader Chi Pham', 'leader.beta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170003', true, 'Dai hoc FPT', null, 'https://example.com/cards/ai170003.png', null, 'LEADER', 'APPROVED'),
@@ -197,7 +197,7 @@ INSERT INTO notifications (
     id, created_at, updated_at, title, body, target_role, recipient_id, sender_id
 ) VALUES
     (1, now(), now(), 'Mo cong dang ky SEAL Spring 2026', 'Coordinator da mo cong dang ky cho SEAL Hackathon Spring 2026.', 'MEMBER', null, 2),
-    (2, now(), now(), 'Can cham bai Round 1', 'Judge vui long cham cac bai nop Round 1 truoc deadline.', 'JUDGE', null, 2);
+    (2, now(), now(), 'Can cham bai Round 1', 'Staff duoc phan cong Judge vui long cham cac bai nop Round 1 truoc deadline.', 'STAFF', null, 2);
 
 INSERT INTO chat_messages (id, created_at, updated_at, team_id, sender_id, content) VALUES
     (1, now(), now(), 1, 5, 'Team Alpha, hay them risk log va deployment note vao submission.'),
@@ -304,5 +304,9 @@ SELECT setval(pg_get_serial_sequence('scores', 'id'), (SELECT max(id) FROM score
 SELECT setval(pg_get_serial_sequence('prizes', 'id'), (SELECT max(id) FROM prizes));
 SELECT setval(pg_get_serial_sequence('notifications', 'id'), (SELECT max(id) FROM notifications));
 SELECT setval(pg_get_serial_sequence('chat_messages', 'id'), (SELECT max(id) FROM chat_messages));
+
+-- Account role is flexible; team position remains in team_members.role.
+UPDATE users SET role = 'USER' WHERE role IN ('MEMBER', 'LEADER');
+UPDATE notifications SET target_role = 'USER' WHERE target_role IN ('MEMBER', 'LEADER');
 
 COMMIT;

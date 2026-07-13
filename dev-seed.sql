@@ -30,15 +30,15 @@ INSERT INTO users (
 ) VALUES
     (1, now(), now(), 'Admin SEAL', 'admin@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'SEAL Organization', null, null, null, 'ADMIN', 'APPROVED'),
     (2, now(), now(), 'Coordinator Linh Nguyen', 'coordinator@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'FPT University', null, null, null, 'COORDINATOR', 'APPROVED'),
-    (3, now(), now(), 'Judge Minh Tran', 'judge1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'SEAL Partner', null, null, null, 'JUDGE', 'APPROVED'),
-    (4, now(), now(), 'Judge Hanh Pham', 'judge2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Tech Mentor Network', null, null, null, 'JUDGE', 'APPROVED'),
-    (5, now(), now(), 'Mentor Bao Vo', 'mentor1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Software Guild', null, null, null, 'MENTOR', 'APPROVED'),
-    (6, now(), now(), 'Mentor Nhi Le', 'mentor2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'AI Lab', null, null, null, 'MENTOR', 'APPROVED'),
-    (7, now(), now(), 'Leader An Nguyen', 'leader.alpha@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170001', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170001.png', null, 'LEADER', 'APPROVED'),
-    (8, now(), now(), 'Member Binh Tran', 'member.alpha@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170002', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170002.png', null, 'MEMBER', 'APPROVED'),
-    (9, now(), now(), 'Leader Chi Pham', 'leader.beta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170003', true, 'Dai hoc FPT', null, 'https://example.com/cards/ai170003.png', null, 'LEADER', 'APPROVED'),
-    (10, now(), now(), 'Member Duy Le', 'member.beta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170004', true, 'Dai hoc FPT', null, 'https://example.com/cards/ai170004.png', null, 'MEMBER', 'APPROVED'),
-    (11, now(), now(), 'Pending Student', 'pending@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170099', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170099.png', null, 'MEMBER', 'PENDING');
+    (3, now(), now(), 'Staff Minh Tran', 'judge1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'SEAL Partner', null, null, null, 'STAFF', 'APPROVED'),
+    (4, now(), now(), 'Staff Hanh Pham', 'judge2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Tech Mentor Network', null, null, null, 'STAFF', 'APPROVED'),
+    (5, now(), now(), 'Staff Bao Vo', 'mentor1@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'Software Guild', null, null, null, 'STAFF', 'APPROVED'),
+    (6, now(), now(), 'Staff Nhi Le', 'mentor2@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', null, false, 'AI Lab', null, null, null, 'STAFF', 'APPROVED'),
+    (7, now(), now(), 'Leader An Nguyen', 'leader.alpha@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170001', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170001.png', null, 'USER', 'APPROVED'),
+    (8, now(), now(), 'Member Binh Tran', 'member.alpha@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170002', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170002.png', null, 'USER', 'APPROVED'),
+    (9, now(), now(), 'Leader Chi Pham', 'leader.beta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170003', true, 'Dai hoc FPT', null, 'https://example.com/cards/ai170003.png', null, 'USER', 'APPROVED'),
+    (10, now(), now(), 'Member Duy Le', 'member.beta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170004', true, 'Dai hoc FPT', null, 'https://example.com/cards/ai170004.png', null, 'USER', 'APPROVED'),
+    (11, now(), now(), 'Pending Student', 'pending@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170099', true, 'Dai hoc FPT', null, 'https://example.com/cards/se170099.png', null, 'USER', 'PENDING');
 
 INSERT INTO events (
     id, created_at, updated_at, name, season, year, reg_start_date, reg_end_date,
@@ -196,8 +196,8 @@ INSERT INTO prizes (id, created_at, updated_at, name, description, event_id, tea
 INSERT INTO notifications (
     id, created_at, updated_at, title, body, target_role, recipient_id, sender_id
 ) VALUES
-    (1, now(), now(), 'Mo cong dang ky SEAL Spring 2026', 'Coordinator da mo cong dang ky cho SEAL Hackathon Spring 2026.', 'MEMBER', null, 2),
-    (2, now(), now(), 'Can cham bai Round 1', 'Judge vui long cham cac bai nop Round 1 truoc deadline.', 'JUDGE', null, 2);
+    (1, now(), now(), 'Mo cong dang ky SEAL Spring 2026', 'Coordinator da mo cong dang ky cho SEAL Hackathon Spring 2026.', 'USER', null, 2),
+    (2, now(), now(), 'Can cham bai Round 1', 'Staff duoc phan cong Judge vui long cham cac bai nop Round 1 truoc deadline.', 'STAFF', null, 2);
 
 INSERT INTO chat_messages (id, created_at, updated_at, team_id, sender_id, content) VALUES
     (1, now(), now(), 1, 5, 'Team Alpha, hay them risk log va deployment note vao submission.'),
@@ -210,12 +210,12 @@ INSERT INTO users (
     is_fpt_student, university_name, avatar_url, student_card_url,
     rejection_reason, role, status
 ) VALUES
-    (12, now(), now(), 'Leader Khoa Phan', 'leader.gamma@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170005', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Khoa', null, 'LEADER', 'APPROVED'),
-    (13, now(), now(), 'Member Mai Ho', 'member.gamma@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170006', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Mai', null, 'MEMBER', 'APPROVED'),
-    (14, now(), now(), 'Leader Nam Do', 'leader.delta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170007', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Nam', null, 'LEADER', 'APPROVED'),
-    (15, now(), now(), 'Member Oanh Bui', 'member.delta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170008', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Oanh', null, 'MEMBER', 'APPROVED'),
-    (16, now(), now(), 'Student Join Request', 'join.request@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170088', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Join', null, 'MEMBER', 'APPROVED'),
-    (17, now(), now(), 'Pending Upload Student', 'pending.upload@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170100', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/fef3c7/92400e?text=Pending+Student+Card', null, 'MEMBER', 'PENDING');
+    (12, now(), now(), 'Leader Khoa Phan', 'leader.gamma@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170005', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Khoa', null, 'USER', 'APPROVED'),
+    (13, now(), now(), 'Member Mai Ho', 'member.gamma@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170006', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Mai', null, 'USER', 'APPROVED'),
+    (14, now(), now(), 'Leader Nam Do', 'leader.delta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170007', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Nam', null, 'USER', 'APPROVED'),
+    (15, now(), now(), 'Member Oanh Bui', 'member.delta@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'AI170008', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Oanh', null, 'USER', 'APPROVED'),
+    (16, now(), now(), 'Student Join Request', 'join.request@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170088', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Join', null, 'USER', 'APPROVED'),
+    (17, now(), now(), 'Pending Upload Student', 'pending.upload@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170100', true, 'Dai hoc FPT', null, 'https://placehold.co/900x560/fef3c7/92400e?text=Pending+Student+Card', null, 'USER', 'PENDING');
 
 INSERT INTO teams (
     id, created_at, updated_at, name, description, type, join_password,
@@ -304,5 +304,9 @@ SELECT setval(pg_get_serial_sequence('scores', 'id'), (SELECT max(id) FROM score
 SELECT setval(pg_get_serial_sequence('prizes', 'id'), (SELECT max(id) FROM prizes));
 SELECT setval(pg_get_serial_sequence('notifications', 'id'), (SELECT max(id) FROM notifications));
 SELECT setval(pg_get_serial_sequence('chat_messages', 'id'), (SELECT max(id) FROM chat_messages));
+
+-- Account role is flexible; team position remains in team_members.role.
+UPDATE users SET role = 'USER' WHERE role IN ('MEMBER', 'LEADER');
+UPDATE notifications SET target_role = 'USER' WHERE target_role IN ('MEMBER', 'LEADER');
 
 COMMIT;

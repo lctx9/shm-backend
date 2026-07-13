@@ -20,7 +20,7 @@ public class SubmissionController {
     private final SubmissionService submissionService;
 
     @PostMapping
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<SubmissionResponse> submitWork(@RequestBody SubmissionRequest request) {
         return ApiResponse.<SubmissionResponse>builder()
                 .result(submissionService.submitWork(request))
@@ -29,7 +29,7 @@ public class SubmissionController {
 
     // THÊM MỚI: Kiểm tra xem đã nộp bài chưa
     @GetMapping("/my-submission")
-    @PreAuthorize("hasAnyRole('LEADER', 'MEMBER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<SubmissionResponse> getMySubmission() {
         return ApiResponse.<SubmissionResponse>builder()
                 .result(submissionService.getMySubmission())
@@ -38,7 +38,7 @@ public class SubmissionController {
 
     // THÊM MỚI: Cập nhật bài dự thi
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<SubmissionResponse> updateSubmission(@PathVariable Long id, @RequestBody SubmissionRequest request) {
         return ApiResponse.<SubmissionResponse>builder()
                 .result(submissionService.updateSubmission(id, request))
@@ -47,7 +47,7 @@ public class SubmissionController {
 
     // 1. API Lấy toàn bộ bài nộp cho Giám khảo xem
     @GetMapping
-    @PreAuthorize("hasAnyRole('JUDGE', 'MENTOR', 'ADMIN', 'COORDINATOR')")
+    @PreAuthorize("hasAnyRole('STAFF', 'JUDGE', 'MENTOR', 'ADMIN', 'COORDINATOR')")
     public ApiResponse<List<SubmissionResponse>> getAllSubmissions() {
         return ApiResponse.<List<SubmissionResponse>>builder()
                 .result(submissionService.getAllSubmissions())
@@ -56,7 +56,7 @@ public class SubmissionController {
 
     // 2. API Chấm điểm
     @PutMapping("/{id}/grade")
-    @PreAuthorize("hasRole('JUDGE')")
+    @PreAuthorize("hasAnyRole('STAFF', 'JUDGE', 'ADMIN', 'COORDINATOR')")
     public ApiResponse<SubmissionResponse> gradeSubmission(@PathVariable Long id, @RequestBody GradeRequest request) {
         return ApiResponse.<SubmissionResponse>builder()
                 .result(submissionService.gradeSubmission(id, request))

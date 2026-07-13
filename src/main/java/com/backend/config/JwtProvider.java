@@ -1,8 +1,10 @@
 package com.backend.config;
 
+import com.backend.service.SystemConfigurationService;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -11,27 +13,23 @@ import java.util.Date;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class JwtProvider {
-
     private static final String SECRET_KEY = "DayLaMotKhoaBiMatRatDaiVaAnToanChoViecKiemTraChuKyCuaJSONWebTokenZXY";
-    private static final long EXPIRATION_TIME = 86400000; // 1 ngày
+    private final SystemConfigurationService systemConfigurationService;
 
     public String generateToken(String email) {
         return Jwts.builder()
                 .setSubject(email)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .setExpiration(new Date(System.currentTimeMillis() + systemConfigurationService.sessionTimeoutMillis()))
                 .signWith(getSignInKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String getEmailFromJWT(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSignInKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        return claims.getSubject();
+        return Jwts.parserBuilder().setSigningKey(getSignInKey()).build()
+                .parseClaimsJws(token).getBody().getSubject();
     }
 
     public boolean validateToken(String authToken) {
@@ -51,7 +49,6 @@ public class JwtProvider {
     }
 
     private Key getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET_KEY));
     }
 }

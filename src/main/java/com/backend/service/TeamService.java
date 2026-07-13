@@ -5,16 +5,17 @@ import com.backend.dto.response.TeamJoinRequestResponse;
 import com.backend.dto.response.TeamMemberResponse;
 import com.backend.dto.response.TeamResponse;
 import com.backend.entity.HackathonEvent;
+import com.backend.entity.Notification;
 import com.backend.entity.Team;
 import com.backend.entity.TeamJoinRequest;
 import com.backend.entity.TeamMember;
 import com.backend.entity.Track;
 import com.backend.entity.User;
 import com.backend.entity.enums.MemberRole;
-import com.backend.entity.enums.RoleType;
 import com.backend.exception.AppException;
 import com.backend.exception.ErrorCode;
 import com.backend.repository.HackathonEventRepository;
+import com.backend.repository.NotificationRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TeamJoinRequestRepository;
 import com.backend.repository.TeamRepository;
@@ -37,6 +38,7 @@ public class TeamService {
     private final TeamJoinRequestRepository teamJoinRequestRepository;
     private final HackathonEventRepository eventRepository;
     private final TrackRepository trackRepository;
+    private final NotificationRepository notificationRepository;
 
     @Transactional
     public TeamResponse createTeam(TeamCreateRequest request) {
@@ -70,9 +72,6 @@ public class TeamService {
                 .track(track)
                 .build();
         teamRepository.save(newTeam);
-
-        currentUser.setRole(RoleType.LEADER);
-        userRepository.save(currentUser);
 
         TeamMember leaderMember = TeamMember.builder()
                 .team(newTeam)
@@ -142,6 +141,14 @@ public class TeamService {
                 .role(MemberRole.MEMBER)
                 .build());
 
+        notificationRepository.save(Notification.builder()
+                .title("Bạn đã được mời vào đội " + leader.getTeam().getName())
+                .body(leader.getUser().getFullName() + " đã mời bạn tham gia đội. Mở trang Đội của tôi để xem chi tiết.")
+                .recipient(invitedUser)
+                .sender(leader.getUser())
+                .actionUrl("/my-team")
+                .build());
+
         return toTeamResponse(leader.getTeam());
     }
 
@@ -160,14 +167,10 @@ public class TeamService {
         }
 
         currentLeader.setRole(MemberRole.MEMBER);
-        currentLeader.getUser().setRole(RoleType.MEMBER);
         nextLeader.setRole(MemberRole.LEADER);
-        nextLeader.getUser().setRole(RoleType.LEADER);
 
         teamMemberRepository.save(currentLeader);
         teamMemberRepository.save(nextLeader);
-        userRepository.save(currentLeader.getUser());
-        userRepository.save(nextLeader.getUser());
 
         return toTeamResponse(currentLeader.getTeam());
     }

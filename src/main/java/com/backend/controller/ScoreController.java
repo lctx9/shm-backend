@@ -14,9 +14,9 @@ public class ScoreController {
 
     private final ScoreService scoreService;
 
-    // Chỉ có JUDGE mới được chấm điểm
+    // STAFF chỉ được chấm khi có assignment judge ở matrix tương ứng.
     @PostMapping("/grade")
-    @PreAuthorize("hasRole('JUDGE')")
+    @PreAuthorize("hasAnyRole('STAFF', 'JUDGE', 'ADMIN', 'COORDINATOR')")
     public ApiResponse<String> gradeSubmission(@RequestBody ScoreRequest request) {
         scoreService.gradeSubmission(request);
         return ApiResponse.<String>builder()

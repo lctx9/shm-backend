@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 public class EventRequest {
     private String name;
+    private String description;
     private Season season;
     private int year;
     private LocalDateTime regStartDate;
@@ -15,6 +16,7 @@ public class EventRequest {
     private LocalDateTime eventStartDate;
     private LocalDateTime eventEndDate;
     private List<String> tracks;
+    private List<TrackConfigRequest> trackConfigs;
     private Integer roundCount;
     private LocalDateTime submissionDeadline;
     private String submissionFormSchema;

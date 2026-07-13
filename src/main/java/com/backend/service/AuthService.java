@@ -31,10 +31,12 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final JavaMailSender mailSender;
+    private final SystemConfigurationService systemConfigurationService;
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, OtpRecord> registrationOtps = new ConcurrentHashMap<>();
 
     public String sendRegistrationOtp(String email) {
+        ensureRegistrationEnabled();
         String normalizedEmail = normalizeEmail(email);
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new AppException(ErrorCode.USER_EXISTED);
@@ -61,6 +63,7 @@ public class AuthService {
     }
 
     public String register(RegisterRequest request) {
+        ensureRegistrationEnabled();
         String normalizedEmail = normalizeEmail(request.getEmail());
         if (userRepository.existsByEmail(normalizedEmail)) {
             throw new AppException(ErrorCode.USER_EXISTED);
@@ -76,7 +79,7 @@ public class AuthService {
                 .isFptStudent(request.isFptStudent())
                 .universityName(request.isFptStudent() ? "Đại học FPT" : request.getUniversityName())
                 .studentCardUrl(request.getStudentCardUrl())
-                .role(RoleType.MEMBER)
+                .role(RoleType.USER)
                 .status(AccountStatus.PENDING)
                 .build();
 
@@ -90,6 +93,13 @@ public class AuthService {
         User user = userRepository.findByEmail(normalizeEmail(request.getEmail()))
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        if (user.getStatus() != AccountStatus.APPROVED) {
+            throw new RuntimeException("Tài khoản chưa được duyệt hoặc đã bị khóa");
+        }
+        if (systemConfigurationService.maintenanceMode() && user.getRole() != RoleType.ADMIN) {
+            throw new RuntimeException("Hệ thống đang bảo trì. Vui lòng quay lại sau.");
+        }
+
         boolean isMatch = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if (!isMatch) {
             throw new AppException(ErrorCode.INVALID_PASSWORD);
@@ -101,7 +111,9 @@ public class AuthService {
                 .token(token)
                 .userId(user.getId())
                 .email(user.getEmail())
-                .role(user.getRole().name())
+                .role((user.getRole() == RoleType.MENTOR || user.getRole() == RoleType.JUDGE)
+                        ? RoleType.STAFF.name()
+                        : user.getRole().name())
                 .build();
     }
 
@@ -127,6 +139,12 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase();
+    }
+
+    private void ensureRegistrationEnabled() {
+        if (!systemConfigurationService.registrationEnabled()) {
+            throw new RuntimeException("Hệ thống đang tạm đóng đăng ký tài khoản mới");
+        }
     }
 
     private record OtpRecord(String code, LocalDateTime expiresAt) {

@@ -8,6 +8,8 @@ import com.backend.entity.Team;
 import com.backend.entity.TeamMember;
 import com.backend.entity.TrackRoundMatrix;
 import com.backend.entity.User;
+import com.backend.entity.enums.RoleType;
+import com.backend.entity.enums.MemberRole;
 import com.backend.repository.SubmissionRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TeamRepository;
@@ -36,6 +38,8 @@ public class SubmissionService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đội thi"));
         TrackRoundMatrix matrix = matrixRepository.findById(request.getMatrixId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy vòng thi"));
+
+        requireTeamLeader(team.getId());
 
         if (team.getTrack() == null || !team.getTrack().getId().equals(matrix.getTrack().getId())) {
             throw new RuntimeException("Vòng thi không thuộc hạng mục của đội");
@@ -70,6 +74,10 @@ public class SubmissionService {
         TrackRoundMatrix matrix = matrixRepository.findById(request.getMatrixId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy vòng thi"));
 
+        if (submission.getTeam() == null || !submission.getTeam().getId().equals(request.getTeamId())) {
+            throw new RuntimeException("Bài nộp không thuộc đội đã chọn");
+        }
+        requireTeamLeader(submission.getTeam().getId());
         submission.setMatrix(matrix);
         submission.setFileUrl(request.getFileUrl());
         submission.setIsGraded(false);
@@ -81,13 +89,29 @@ public class SubmissionService {
     }
 
     public List<SubmissionResponse> getAllSubmissions() {
-        return submissionRepository.findAll().stream().map(this::toSubmissionResponse).toList();
+        User user = getCurrentUser();
+        if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR) {
+            return submissionRepository.findAll().stream().map(this::toSubmissionResponse).toList();
+        }
+
+        return submissionRepository.findAll().stream()
+                .filter(submission -> isAssignedToMatrix(user, submission.getMatrix()))
+                .map(this::toSubmissionResponse)
+                .toList();
     }
 
     @Transactional
     public SubmissionResponse gradeSubmission(Long id, GradeRequest request) {
         Submission submission = submissionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy bài nộp"));
+
+        User user = getCurrentUser();
+        boolean manager = user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR;
+        boolean judge = submission.getMatrix() != null && submission.getMatrix().getJudges() != null
+                && submission.getMatrix().getJudges().stream().anyMatch(item -> item.getId().equals(user.getId()));
+        if (!manager && !judge) {
+            throw new RuntimeException("Bạn chưa được phân công làm giám khảo cho vòng đấu này");
+        }
 
         submission.setScore(request.getScore());
         submission.setFeedback(request.getFeedback());
@@ -97,11 +121,30 @@ public class SubmissionService {
     }
 
     private Team getCurrentUserTeam() {
-        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+        User currentUser = getCurrentUser();
         TeamMember membership = teamMemberRepository.findByUser(currentUser).orElse(null);
         return membership == null ? null : membership.getTeam();
+    }
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+    }
+
+    private boolean isAssignedToMatrix(User user, TrackRoundMatrix matrix) {
+        if (matrix == null) return false;
+        boolean mentor = matrix.getMentors() != null && matrix.getMentors().stream().anyMatch(item -> item.getId().equals(user.getId()));
+        boolean judge = matrix.getJudges() != null && matrix.getJudges().stream().anyMatch(item -> item.getId().equals(user.getId()));
+        return mentor || judge;
+    }
+
+    private void requireTeamLeader(Long teamId) {
+        TeamMember membership = teamMemberRepository.findByUser(getCurrentUser())
+                .orElseThrow(() -> new RuntimeException("Bạn chưa tham gia đội thi"));
+        if (!membership.getTeam().getId().equals(teamId) || membership.getRole() != MemberRole.LEADER) {
+            throw new RuntimeException("Chỉ Leader của đội mới được nộp hoặc cập nhật bài");
+        }
     }
 
     private SubmissionResponse toSubmissionResponse(Submission submission) {
@@ -113,7 +156,7 @@ public class SubmissionService {
                 .teamId(team == null ? null : team.getId())
                 .teamName(team == null ? null : team.getName())
                 .matrixId(matrix == null ? null : matrix.getId())
-                .trackName(matrix == null ? null : matrix.getTrack().getName())
+                .trackName(matrix == null ? null : (matrix.getTrack() == null ? "Chung kết" : matrix.getTrack().getName()))
                 .roundName(matrix == null ? null : matrix.getRound().getName())
                 .fileUrl(submission.getFileUrl())
                 .flagged(submission.isFlagged())

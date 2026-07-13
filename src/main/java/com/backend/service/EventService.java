@@ -1,6 +1,7 @@
 package com.backend.service;
 
 import com.backend.dto.request.EventRequest;
+import com.backend.dto.request.TrackConfigRequest;
 import com.backend.dto.request.MatrixUpdateRequest;
 import com.backend.dto.request.PrizeRequest;
 import com.backend.dto.response.EventResponse;
@@ -16,6 +17,7 @@ import com.backend.entity.Team;
 import com.backend.entity.Track;
 import com.backend.entity.TrackRoundMatrix;
 import com.backend.entity.User;
+import com.backend.entity.enums.RoleType;
 import com.backend.repository.HackathonEventRepository;
 import com.backend.repository.PrizeRepository;
 import com.backend.repository.RoundRepository;
@@ -28,7 +30,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +50,7 @@ public class EventService {
     public EventResponse createEvent(EventRequest request) {
         HackathonEvent newEvent = HackathonEvent.builder()
                 .name(request.getName())
+                .description(request.getDescription())
                 .season(request.getSeason())
                 .year(request.getYear())
                 .regStartDate(request.getRegStartDate())
@@ -53,7 +58,7 @@ public class EventService {
                 .eventStartDate(request.getEventStartDate())
                 .eventEndDate(request.getEventEndDate())
                 .defaultSubmissionDeadline(request.getSubmissionDeadline())
-                .roundCount(request.getRoundCount() == null || request.getRoundCount() < 1 ? 1 : request.getRoundCount())
+                .roundCount(request.getRoundCount() == null || request.getRoundCount() < 2 ? 2 : request.getRoundCount())
                 .structureInitialized(false)
                 .submissionFormSchema(request.getSubmissionFormSchema())
                 .competitionRules(request.getCompetitionRules())
@@ -63,11 +68,7 @@ public class EventService {
 
         HackathonEvent savedEvent = eventRepository.save(newEvent);
 
-        safeTrackNames(request).forEach(name -> trackRepository.save(Track.builder()
-                .name(name.trim())
-                .description("")
-                .event(savedEvent)
-                .build()));
+        saveTracks(savedEvent, request);
 
         return getEvent(savedEvent.getId());
     }
@@ -78,6 +79,7 @@ public class EventService {
                 .orElseThrow(() -> new RuntimeException("KhÃ´ng tÃ¬m tháº¥y giáº£i Ä‘áº¥u"));
 
         event.setName(request.getName());
+        event.setDescription(request.getDescription());
         event.setSeason(request.getSeason());
         event.setYear(request.getYear());
         event.setRegStartDate(request.getRegStartDate());
@@ -85,7 +87,7 @@ public class EventService {
         event.setEventStartDate(request.getEventStartDate());
         event.setEventEndDate(request.getEventEndDate());
         event.setDefaultSubmissionDeadline(request.getSubmissionDeadline());
-        event.setRoundCount(request.getRoundCount() == null || request.getRoundCount() < 1 ? 1 : request.getRoundCount());
+        event.setRoundCount(request.getRoundCount() == null || request.getRoundCount() < 2 ? 2 : request.getRoundCount());
         event.setSubmissionFormSchema(request.getSubmissionFormSchema());
         event.setCompetitionRules(request.getCompetitionRules());
         event.setRuleDocumentUrl(request.getRuleDocumentUrl());
@@ -93,14 +95,10 @@ public class EventService {
             event.setActive(request.getActive());
         }
 
-        boolean hasStructure = Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByTrackEventId(eventId) > 0;
-        if (!hasStructure && request.getTracks() != null) {
+        boolean hasStructure = Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByRoundEventId(eventId) > 0;
+        if (!hasStructure && (request.getTracks() != null || request.getTrackConfigs() != null)) {
             trackRepository.deleteAll(trackRepository.findByEventId(eventId));
-            safeTrackNames(request).forEach(name -> trackRepository.save(Track.builder()
-                    .name(name.trim())
-                    .description("")
-                    .event(event)
-                    .build()));
+            saveTracks(event, request);
         }
 
         eventRepository.save(event);
@@ -120,7 +118,7 @@ public class EventService {
         HackathonEvent event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
 
-        if (Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByTrackEventId(eventId) > 0) {
+        if (Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByRoundEventId(eventId) > 0) {
             throw new RuntimeException("Cấu trúc trận đấu đã được khởi tạo");
         }
 
@@ -129,24 +127,36 @@ public class EventService {
             throw new RuntimeException("Giải đấu chưa có track để khởi tạo ma trận");
         }
 
-        int roundCount = event.getRoundCount() == null || event.getRoundCount() < 1 ? 1 : event.getRoundCount();
+        int roundCount = event.getRoundCount() == null || event.getRoundCount() < 2 ? 2 : event.getRoundCount();
+        event.setRoundCount(roundCount);
         List<Round> rounds = java.util.stream.IntStream.rangeClosed(1, roundCount)
                 .mapToObj(index -> roundRepository.save(Round.builder()
-                        .name("Vòng " + index)
+                        .name(index == roundCount ? "Vòng chung kết" : "Vòng " + index)
                         .orderIndex(index)
                         .event(event)
                         .build()))
                 .toList();
 
+        List<Round> qualifyingRounds = rounds.subList(0, rounds.size() - 1);
         for (Track track : tracks) {
-            for (Round round : rounds) {
+            for (Round round : qualifyingRounds) {
                 matrixRepository.save(TrackRoundMatrix.builder()
                         .track(track)
                         .round(round)
                         .submissionDeadline(event.getDefaultSubmissionDeadline())
+                        .mentors(track.getMentors())
                         .build());
             }
         }
+
+        Set<User> finalMentors = tracks.stream()
+                .flatMap(track -> track.getMentors() == null ? java.util.stream.Stream.empty() : track.getMentors().stream())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        matrixRepository.save(TrackRoundMatrix.builder()
+                .round(rounds.get(rounds.size() - 1))
+                .submissionDeadline(event.getDefaultSubmissionDeadline())
+                .mentors(finalMentors)
+                .build());
 
         event.setStructureInitialized(true);
         eventRepository.save(event);
@@ -171,7 +181,7 @@ public class EventService {
     }
 
     public List<MatrixResponse> getMatrices(Long eventId) {
-        return matrixRepository.findByTrackEventId(eventId).stream()
+        return matrixRepository.findByRoundEventId(eventId).stream()
                 .sorted(Comparator.comparing(matrix -> matrix.getRound().getOrderIndex()))
                 .map(this::toMatrixResponse)
                 .toList();
@@ -182,20 +192,24 @@ public class EventService {
         TrackRoundMatrix matrix = matrixRepository.findById(matrixId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ô ma trận"));
 
+        if (request.getJudgeIds() != null && (request.getJudgeIds().size() < 2 || request.getJudgeIds().size() > 4)) {
+            throw new RuntimeException("Mỗi vòng đấu cần từ 2 đến 4 giám khảo");
+        }
+        if (matrix.getTrack() != null && (request.getTopN() == null || request.getTopN() < 1)) {
+            throw new RuntimeException("Top N của vòng loại phải lớn hơn 0");
+        }
+
         matrix.setGuidelineUrl(request.getGuidelineUrl());
         matrix.setSubmissionDeadline(request.getSubmissionDeadline());
         matrix.setScoringCriteriaJson(request.getScoringCriteriaJson());
+        matrix.setTopN(request.getTopN());
 
         if (request.getMentorIds() != null) {
-            matrix.setMentors(request.getMentorIds().stream()
-                    .map(id -> userRepository.findById(id).orElseThrow(() -> new RuntimeException("Không tìm thấy mentor")))
-                    .collect(java.util.stream.Collectors.toSet()));
+            matrix.setMentors(resolveUsers(request.getMentorIds(), "mentor"));
         }
 
         if (request.getJudgeIds() != null) {
-            matrix.setJudges(request.getJudgeIds().stream()
-                    .map(id -> userRepository.findById(id).orElseThrow(() -> new RuntimeException("Không tìm thấy judge")))
-                    .collect(java.util.stream.Collectors.toSet()));
+            matrix.setJudges(resolveUsers(request.getJudgeIds(), "judge"));
         }
 
         return toMatrixResponse(matrixRepository.save(matrix));
@@ -248,7 +262,7 @@ public class EventService {
                 .map(this::toRoundResponse)
                 .toList();
 
-        List<MatrixResponse> matrices = matrixRepository.findByTrackEventId(event.getId()).stream()
+        List<MatrixResponse> matrices = matrixRepository.findByRoundEventId(event.getId()).stream()
                 .sorted(Comparator.comparing(matrix -> matrix.getRound().getOrderIndex()))
                 .map(this::toMatrixResponse)
                 .toList();
@@ -256,6 +270,7 @@ public class EventService {
         return EventResponse.builder()
                 .id(event.getId())
                 .name(event.getName())
+                .description(event.getDescription())
                 .season(event.getSeason())
                 .year(event.getYear())
                 .regStartDate(event.getRegStartDate())
@@ -281,6 +296,7 @@ public class EventService {
                 .id(track.getId())
                 .name(track.getName())
                 .description(track.getDescription())
+                .mentors(track.getMentors() == null ? List.of() : track.getMentors().stream().map(this::toUserProfile).toList())
                 .build();
     }
 
@@ -295,11 +311,13 @@ public class EventService {
     private MatrixResponse toMatrixResponse(TrackRoundMatrix matrix) {
         return MatrixResponse.builder()
                 .id(matrix.getId())
-                .trackId(matrix.getTrack().getId())
-                .trackName(matrix.getTrack().getName())
+                .trackId(matrix.getTrack() == null ? null : matrix.getTrack().getId())
+                .trackName(matrix.getTrack() == null ? "Chung kết" : matrix.getTrack().getName())
                 .roundId(matrix.getRound().getId())
                 .roundName(matrix.getRound().getName())
                 .roundOrder(matrix.getRound().getOrderIndex())
+                .finalRound(matrix.getTrack() == null)
+                .topN(matrix.getTopN())
                 .guidelineUrl(matrix.getGuidelineUrl())
                 .submissionDeadline(matrix.getSubmissionDeadline())
                 .scoringCriteriaJson(matrix.getScoringCriteriaJson())
@@ -331,6 +349,16 @@ public class EventService {
     }
 
     private List<String> safeTrackNames(EventRequest request) {
+        if (request.getTrackConfigs() != null && !request.getTrackConfigs().isEmpty()) {
+            List<String> configuredNames = request.getTrackConfigs().stream()
+                    .map(TrackConfigRequest::getName)
+                    .filter(name -> name != null && !name.trim().isEmpty())
+                    .map(String::trim)
+                    .distinct()
+                    .toList();
+            if (!configuredNames.isEmpty()) return configuredNames;
+        }
+
         if (request.getTracks() == null || request.getTracks().isEmpty()) {
             return List.of("Bảng chung");
         }
@@ -340,5 +368,52 @@ public class EventService {
                 .distinct()
                 .toList();
         return names.isEmpty() ? List.of("Bảng chung") : names;
+    }
+
+    private void saveTracks(HackathonEvent event, EventRequest request) {
+        if (request.getTrackConfigs() != null && !request.getTrackConfigs().isEmpty()) {
+            long uniqueNames = request.getTrackConfigs().stream()
+                    .map(TrackConfigRequest::getName)
+                    .filter(java.util.Objects::nonNull)
+                    .map(name -> name.trim().toLowerCase())
+                    .distinct()
+                    .count();
+            if (uniqueNames != request.getTrackConfigs().size()) {
+                throw new RuntimeException("Tên các bảng đấu không được trùng nhau hoặc để trống");
+            }
+            if (request.getTrackConfigs().stream().anyMatch(config -> config.getMentorIds() == null
+                    || config.getMentorIds().size() < 1 || config.getMentorIds().size() > 2)) {
+                throw new RuntimeException("Mỗi bảng đấu cần từ 1 đến 2 mentor");
+            }
+            request.getTrackConfigs().stream()
+                    .filter(config -> config.getName() != null && !config.getName().trim().isEmpty())
+                    .forEach(config -> trackRepository.save(Track.builder()
+                            .name(config.getName().trim())
+                            .description("")
+                            .event(event)
+                            .mentors(resolveUsers(config.getMentorIds(), "mentor"))
+                            .build()));
+            return;
+        }
+
+        safeTrackNames(request).forEach(name -> trackRepository.save(Track.builder()
+                .name(name.trim())
+                .description("")
+                .event(event)
+                .mentors(new LinkedHashSet<>())
+                .build()));
+    }
+
+    private Set<User> resolveUsers(Set<Long> ids, String label) {
+        if (ids == null) return new LinkedHashSet<>();
+        return ids.stream()
+                .map(id -> userRepository.findById(id)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy " + label)))
+                .peek(user -> {
+                    if (user.getRole() != RoleType.STAFF && user.getRole() != RoleType.MENTOR && user.getRole() != RoleType.JUDGE) {
+                        throw new RuntimeException("Chỉ có tài khoản STAFF mới được phân công mentor/judge");
+                    }
+                })
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 }

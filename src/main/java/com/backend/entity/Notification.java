@@ -29,4 +29,7 @@ public class Notification extends BaseEntity {
     @ManyToOne
     @JoinColumn(name = "sender_id")
     private User sender;
+
+    @Column(name = "action_url")
+    private String actionUrl;
 }

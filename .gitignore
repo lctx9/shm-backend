@@ -3,6 +3,7 @@ shm-backend/
 shm-frontend/
 HELP.md
 target/
+backups/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

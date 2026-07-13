@@ -19,5 +19,7 @@ public class NotificationResponse {
     private RoleType targetRole;
     private String recipientEmail;
     private String senderEmail;
+    private String actionUrl;
+    private boolean read;
     private LocalDateTime createdAt;
 }

@@ -11,6 +11,7 @@ import com.backend.entity.enums.RoleType;
 import com.backend.repository.PrizeRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.UserRepository;
+import com.backend.repository.TrackRoundMatrixRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,6 +33,7 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final TeamMemberRepository teamMemberRepository;
     private final PrizeRepository prizeRepository;
+    private final TrackRoundMatrixRepository matrixRepository;
 
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> getCurrentUser() {
@@ -54,15 +56,34 @@ public class UserController {
     @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> getUsersByRole(@PathVariable RoleType role) {
         Map<String, Object> response = new HashMap<>();
-        response.put("result", userRepository.findByRole(role).stream().map(this::toProfile).toList());
+        List<User> users = role == RoleType.STAFF
+                ? userRepository.findByRoleIn(List.of(RoleType.STAFF, RoleType.MENTOR, RoleType.JUDGE))
+                : userRepository.findByRole(role);
+        response.put("result", users.stream().map(this::toProfile).toList());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me/assignments")
+    public ResponseEntity<Map<String, Object>> getMyAssignments() {
+        User user = getAuthenticatedUser();
+        Map<String, Object> assignments = new HashMap<>();
+        assignments.put("mentor", !matrixRepository.findDistinctByMentorsId(user.getId()).isEmpty());
+        assignments.put("judge", !matrixRepository.findDistinctByJudgesId(user.getId()).isEmpty());
+        assignments.put("mentorMatrixIds", matrixRepository.findDistinctByMentorsId(user.getId()).stream().map(matrix -> matrix.getId()).toList());
+        assignments.put("judgeMatrixIds", matrixRepository.findDistinctByJudgesId(user.getId()).stream().map(matrix -> matrix.getId()).toList());
+        Map<String, Object> response = new HashMap<>();
+        response.put("result", assignments);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/staff")
     @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> createStaff(@RequestBody StaffCreateRequest request) {
-        if (request.getRole() != RoleType.MENTOR && request.getRole() != RoleType.JUDGE && request.getRole() != RoleType.COORDINATOR) {
-            throw new RuntimeException("Chỉ được tạo tài khoản MENTOR, JUDGE hoặc COORDINATOR tại đây");
+        User actor = getAuthenticatedUser();
+        boolean allowed = request.getRole() == RoleType.STAFF
+                || (actor.getRole() == RoleType.ADMIN && request.getRole() == RoleType.COORDINATOR);
+        if (!allowed) {
+            throw new RuntimeException("Chỉ được tạo tài khoản STAFF hoặc COORDINATOR tại đây");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {

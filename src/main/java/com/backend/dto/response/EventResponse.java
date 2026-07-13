@@ -16,6 +16,7 @@ import java.util.List;
 public class EventResponse {
     private Long id;
     private String name;
+    private String description;
     private Season season;
     private int year;
     private LocalDateTime regStartDate;

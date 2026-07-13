@@ -17,4 +17,12 @@ public class Track extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id")
     private HackathonEvent event;
+
+    @ManyToMany
+    @JoinTable(
+            name = "track_mentors",
+            joinColumns = @JoinColumn(name = "track_id"),
+            inverseJoinColumns = @JoinColumn(name = "mentor_id")
+    )
+    private java.util.Set<User> mentors;
 }

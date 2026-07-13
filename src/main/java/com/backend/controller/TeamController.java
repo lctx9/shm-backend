@@ -21,7 +21,7 @@ public class TeamController {
     private final TeamService teamService;
 
     @PostMapping("/create")
-    @PreAuthorize("hasRole('MEMBER') or hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<TeamResponse> createTeam(@RequestBody TeamCreateRequest request) {
         return ApiResponse.<TeamResponse>builder()
                 .result(teamService.createTeam(request))
@@ -36,7 +36,7 @@ public class TeamController {
     }
 
     @GetMapping("/my-team")
-    @PreAuthorize("hasAnyRole('LEADER', 'MEMBER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<TeamResponse> getMyTeam() {
         return ApiResponse.<TeamResponse>builder()
                 .result(teamService.getMyTeam())
@@ -44,7 +44,7 @@ public class TeamController {
     }
 
     @DeleteMapping("/{teamId}/members/{memberId}")
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<String> removeMember(@PathVariable Long teamId, @PathVariable Long memberId) {
         teamService.removeMember(teamId, memberId);
         return ApiResponse.<String>builder()
@@ -53,7 +53,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/invite")
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<TeamResponse> inviteMember(@PathVariable Long teamId, @RequestBody java.util.Map<String, String> body) {
         return ApiResponse.<TeamResponse>builder()
                 .result(teamService.inviteMemberByEmail(teamId, body.get("email")))
@@ -61,7 +61,7 @@ public class TeamController {
     }
 
     @PutMapping("/{teamId}/leader/{memberId}")
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<TeamResponse> transferLeader(@PathVariable Long teamId, @PathVariable Long memberId) {
         return ApiResponse.<TeamResponse>builder()
                 .result(teamService.transferLeader(teamId, memberId))
@@ -69,7 +69,7 @@ public class TeamController {
     }
 
     @GetMapping("/{teamId}/join-requests")
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<List<TeamJoinRequestResponse>> getJoinRequests(@PathVariable Long teamId) {
         return ApiResponse.<List<TeamJoinRequestResponse>>builder()
                 .result(teamService.getPendingJoinRequests(teamId))
@@ -77,7 +77,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/join-requests/{requestId}/approve")
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<TeamResponse> approveJoinRequest(@PathVariable Long teamId, @PathVariable Long requestId) {
         return ApiResponse.<TeamResponse>builder()
                 .result(teamService.approveJoinRequest(teamId, requestId))
@@ -85,7 +85,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/join-requests/{requestId}/reject")
-    @PreAuthorize("hasRole('LEADER')")
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<String> rejectJoinRequest(@PathVariable Long teamId, @PathVariable Long requestId) {
         teamService.rejectJoinRequest(teamId, requestId);
         return ApiResponse.<String>builder()
@@ -99,7 +99,7 @@ public class TeamController {
 
     // 1. Xin gia nhập đội PUBLIC (Gửi yêu cầu chờ duyệt)
     @PostMapping("/{teamId}/join-request")
-    @PreAuthorize("hasAnyRole('MEMBER', 'LEADER')") // Đổi sang hasAnyRole để dễ dàng test chuyển đội
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<String> joinPublicTeam(@PathVariable Long teamId) {
         teamService.requestToJoinPublicTeam(teamId);
         return ApiResponse.<String>builder()
@@ -109,7 +109,7 @@ public class TeamController {
 
     // 2. Gia nhập đội PRIVATE (Cần mật khẩu)
     @PostMapping("/{teamId}/join-private")
-    @PreAuthorize("hasAnyRole('MEMBER', 'LEADER')") // Đổi sang hasAnyRole để dễ dàng test chuyển đội
+    @PreAuthorize("hasRole('USER')")
     public ApiResponse<String> joinPrivateTeam(@PathVariable Long teamId, @RequestBody JoinPrivateRequest request) {
         teamService.joinPrivateTeam(teamId, request.getPassword());
         return ApiResponse.<String>builder()
