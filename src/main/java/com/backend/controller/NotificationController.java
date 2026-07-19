@@ -13,6 +13,7 @@ import com.backend.entity.enums.RoleType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,6 +39,9 @@ public class NotificationController {
                         || item.getTargetRole() == currentUser.getRole()
                         || (isStaffRole(item.getTargetRole()) && isStaffRole(currentUser.getRole())))
                 .toList();
+        if (visible.isEmpty()) {
+            return ApiResponse.<List<NotificationResponse>>builder().result(List.of()).build();
+        }
         Set<Long> readIds = notificationReadRepository
                 .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList())
                 .stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
@@ -67,6 +71,7 @@ public class NotificationController {
     }
 
     @PatchMapping("/{id}/read")
+    @Transactional
     public ApiResponse<String> markAsRead(@PathVariable Long id) {
         User currentUser = getCurrentUser();
         Notification notification = notificationRepository.findById(id)
@@ -81,13 +86,29 @@ public class NotificationController {
     }
 
     @PatchMapping("/read-all")
+    @Transactional
     public ApiResponse<String> markAllAsRead() {
         User currentUser = getCurrentUser();
-        notificationRepository.findAllByOrderByCreatedAtDesc().stream()
+        List<Notification> visible = notificationRepository.findAllByOrderByCreatedAtDesc().stream()
                 .filter(item -> isVisibleTo(item, currentUser))
-                .filter(item -> !notificationReadRepository.existsByUserIdAndNotificationId(currentUser.getId(), item.getId()))
+                .toList();
+
+        if (visible.isEmpty()) {
+            return ApiResponse.<String>builder().result("Đã đọc tất cả thông báo").build();
+        }
+
+        Set<Long> readIds = notificationReadRepository
+                .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList())
+                .stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
+
+        List<NotificationRead> newReads = visible.stream()
+                .filter(item -> !readIds.contains(item.getId()))
                 .map(item -> NotificationRead.builder().notification(item).user(currentUser).build())
-                .forEach(notificationReadRepository::save);
+                .toList();
+
+        if (!newReads.isEmpty()) {
+            notificationReadRepository.saveAll(newReads);
+        }
         return ApiResponse.<String>builder().result("Đã đọc tất cả thông báo").build();
     }
 
