@@ -17,4 +17,7 @@ public interface TrackRoundMatrixRepository extends JpaRepository<TrackRoundMatr
     java.util.Optional<TrackRoundMatrix> findByRoundEventIdAndTrackIsNullAndRoundOrderIndex(Long eventId, int orderIndex);
     List<TrackRoundMatrix> findDistinctByMentorsId(Long userId);
     List<TrackRoundMatrix> findDistinctByJudgesId(Long userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT m FROM TrackRoundMatrix m WHERE m.submissionDeadline < :now AND (m.deadlineNotified = false OR m.deadlineNotified IS NULL)")
+    List<TrackRoundMatrix> findEndedMatricesToNotify(@org.springframework.data.repository.query.Param("now") java.time.LocalDateTime now);
 }
