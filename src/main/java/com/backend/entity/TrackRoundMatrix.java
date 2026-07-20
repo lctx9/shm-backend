@@ -26,6 +26,9 @@ public class TrackRoundMatrix extends BaseEntity {
     private LocalDateTime submissionDeadline;
     private Integer topN;
 
+    @Builder.Default
+    private Boolean deadlineNotified = false;
+
     @Column(columnDefinition = "TEXT")
     private String scoringCriteriaJson;
 

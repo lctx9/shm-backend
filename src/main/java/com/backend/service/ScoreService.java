@@ -45,12 +45,17 @@ public class ScoreService {
         Submission submission = submissionRepository.findById(request.getSubmissionId())
                 .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));
 
-        boolean manager = judge.getRole() == RoleType.ADMIN || judge.getRole() == RoleType.COORDINATOR;
         boolean assignedJudge = submission.getMatrix() != null
                 && submission.getMatrix().getJudges() != null
                 && submission.getMatrix().getJudges().stream().anyMatch(user -> user.getId().equals(judge.getId()));
-        if (!manager && !assignedJudge) {
+        if (!assignedJudge) {
             throw new AppException(ErrorCode.JUDGE_NOT_ASSIGNED);
+        }
+
+        if (submission.getMatrix() != null && submission.getMatrix().getSubmissionDeadline() != null) {
+            if (java.time.LocalDateTime.now().isBefore(submission.getMatrix().getSubmissionDeadline())) {
+                throw new RuntimeException("Hạn nộp bài của vòng đấu này chưa kết thúc, giám khảo chưa thể chấm điểm");
+            }
         }
 
         Double finalScore = resolveScore(request);
