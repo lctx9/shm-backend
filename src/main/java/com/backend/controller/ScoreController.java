@@ -17,7 +17,7 @@ public class ScoreController {
     // STAFF chỉ được chấm khi có assignment judge ở matrix tương ứng.
     @PostMapping("/grade")
     @PreAuthorize("hasAnyRole('STAFF', 'JUDGE', 'ADMIN', 'COORDINATOR')")
-    public ApiResponse<String> gradeSubmission(@RequestBody ScoreRequest request) {
+    public ApiResponse<String> gradeSubmission(@RequestBody @jakarta.validation.Valid ScoreRequest request) {
         scoreService.gradeSubmission(request);
         return ApiResponse.<String>builder()
                 .result("Lưu điểm thành công")

@@ -19,7 +19,10 @@ public enum ErrorCode {
     ALREADY_IN_TEAM(1007, "Bạn đã tham gia một đội rồi, không thể thực hiện thao tác này!", HttpStatus.BAD_REQUEST),
     TEAM_NOT_FOUND(1008, "Không tìm thấy đội thi yêu cầu", HttpStatus.NOT_FOUND),
     INVALID_JOIN_TYPE(1009, "Chế độ tham gia không đúng với thiết lập của đội (Public/Private)", HttpStatus.BAD_REQUEST),
-    WRONG_JOIN_PASSWORD(1010, "Mật khẩu gia nhập đội thi không chính xác", HttpStatus.BAD_REQUEST);
+    WRONG_JOIN_PASSWORD(1010, "Mật khẩu gia nhập đội thi không chính xác", HttpStatus.BAD_REQUEST),
+    VALIDATION_ERROR(1011, "Dữ liệu đầu vào không hợp lệ", HttpStatus.BAD_REQUEST),
+    BUSINESS_ERROR(1012, "Lỗi nghiệp vụ phát sinh", HttpStatus.BAD_REQUEST),
+    DATABASE_ERROR(1013, "Lỗi ràng buộc hoặc trùng lặp dữ liệu cơ sở dữ liệu", HttpStatus.CONFLICT);
 
     private final int code;
     private final String message;

@@ -64,6 +64,7 @@ public class EventService {
                 .competitionRules(request.getCompetitionRules())
                 .ruleDocumentUrl(request.getRuleDocumentUrl())
                 .isActive(true)
+                .resultsPublished(request.getResultsPublished() != null ? request.getResultsPublished() : false)
                 .build();
 
         HackathonEvent savedEvent = eventRepository.save(newEvent);
@@ -93,6 +94,9 @@ public class EventService {
         event.setRuleDocumentUrl(request.getRuleDocumentUrl());
         if (request.getActive() != null) {
             event.setActive(request.getActive());
+        }
+        if (request.getResultsPublished() != null) {
+            event.setResultsPublished(request.getResultsPublished());
         }
 
         boolean hasStructure = Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByRoundEventId(eventId) > 0;
@@ -251,6 +255,9 @@ public class EventService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
         Team team = request.getTeamId() == null ? null : teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đội nhận giải"));
+        if (team != null && !team.getEvent().getId().equals(event.getId())) {
+            throw new RuntimeException("Đội thi không thuộc giải đấu đã chọn");
+        }
 
         Prize prize = Prize.builder()
                 .name(request.getName())
@@ -267,6 +274,10 @@ public class EventService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giải thưởng"));
         Team team = request.getTeamId() == null ? null : teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đội nhận giải"));
+
+        if (team != null && !team.getEvent().getId().equals(prize.getEvent().getId())) {
+            throw new RuntimeException("Đội thi không thuộc giải đấu đã chọn");
+        }
 
         prize.setName(request.getName());
         prize.setDescription(request.getDescription());
@@ -307,6 +318,7 @@ public class EventService {
                 .roundCount(event.getRoundCount())
                 .structureInitialized(Boolean.TRUE.equals(event.getStructureInitialized()) || !matrices.isEmpty())
                 .active(event.isActive())
+                .resultsPublished(Boolean.TRUE.equals(event.getResultsPublished()))
                 .submissionFormSchema(event.getSubmissionFormSchema())
                 .competitionRules(event.getCompetitionRules())
                 .ruleDocumentUrl(event.getRuleDocumentUrl())

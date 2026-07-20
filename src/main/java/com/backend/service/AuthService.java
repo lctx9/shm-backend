@@ -27,6 +27,9 @@ public class AuthService {
 
     private static final int OTP_TTL_MINUTES = 10;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username:sealfpt@gmail.com}")
+    private String mailFrom;
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
@@ -46,6 +49,7 @@ public class AuthService {
         registrationOtps.put(normalizedEmail, new OtpRecord(otp, LocalDateTime.now().plusMinutes(OTP_TTL_MINUTES)));
 
         SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(mailFrom);
         message.setTo(normalizedEmail);
         message.setSubject("Mã OTP đăng ký SEAL Hackathon");
         message.setText("""
@@ -57,7 +61,16 @@ public class AuthService {
 
                 SEAL Hackathon Team
                 """.formatted(otp, OTP_TTL_MINUTES));
-        mailSender.send(message);
+
+        try {
+            mailSender.send(message);
+        } catch (Exception e) {
+            String errorDetail = e.getMessage();
+            if (e.getCause() != null) {
+                errorDetail += " (Cause: " + e.getCause().getMessage() + ")";
+            }
+            throw new RuntimeException("Không thể gửi email mã OTP. Lỗi SMTP: " + errorDetail);
+        }
 
         return "Đã gửi mã OTP đến email của bạn. Vui lòng kiểm tra hộp thư.";
     }

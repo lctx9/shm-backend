@@ -54,12 +54,4 @@ public class SubmissionController {
                 .build();
     }
 
-    // 2. API Chấm điểm
-    @PutMapping("/{id}/grade")
-    @PreAuthorize("hasAnyRole('STAFF', 'JUDGE', 'ADMIN', 'COORDINATOR')")
-    public ApiResponse<SubmissionResponse> gradeSubmission(@PathVariable Long id, @RequestBody GradeRequest request) {
-        return ApiResponse.<SubmissionResponse>builder()
-                .result(submissionService.gradeSubmission(id, request))
-                .build();
-    }
 }

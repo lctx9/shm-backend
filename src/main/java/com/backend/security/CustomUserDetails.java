@@ -39,8 +39,7 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        // Có thể check user.getStatus() == BANNED ở đây
-        return true;
+        return user.getStatus() != com.backend.entity.enums.AccountStatus.BANNED;
     }
 
     @Override
@@ -50,6 +49,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return user.getStatus() == com.backend.entity.enums.AccountStatus.APPROVED;
     }
 }

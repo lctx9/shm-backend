@@ -167,7 +167,7 @@ public class UserController {
         List<User> users = userRepository.findAll();
 
         Map<String, Object> response = new HashMap<>();
-        response.put("result", users);
+        response.put("result", users.stream().map(this::toProfile).toList());
         return ResponseEntity.ok(response);
     }
 
@@ -177,8 +177,17 @@ public class UserController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
 
+        User actor = getAuthenticatedUser();
+        if (id.equals(actor.getId())) {
+            throw new RuntimeException("Bạn không thể tự khóa tài khoản đang đăng nhập");
+        }
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
+
+        if (actor.getRole() == RoleType.COORDINATOR && user.getRole() != RoleType.USER) {
+            throw new RuntimeException("Coordinator chỉ được thay đổi trạng thái của tài khoản Thí sinh (USER)");
+        }
 
         user.setStatus(AccountStatus.valueOf(body.get("status")));
         user.setRejectionReason(body.get("reason"));
@@ -196,6 +205,14 @@ public class UserController {
     }
 
     private UserProfileResponse toProfile(User user) {
+        String currentEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByEmail(currentEmail).orElse(null);
+        boolean isStaffOrAdmin = currentUser != null && (
+                currentUser.getRole() == RoleType.ADMIN || currentUser.getRole() == RoleType.COORDINATOR
+        );
+        boolean isSelf = currentUser != null && currentUser.getId().equals(user.getId());
+        String cardUrl = (isStaffOrAdmin || isSelf) ? user.getStudentCardUrl() : null;
+
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
@@ -204,7 +221,7 @@ public class UserController {
                 .fptStudent(user.isFptStudent())
                 .universityName(user.getUniversityName())
                 .avatarUrl(user.getAvatarUrl())
-                .studentCardUrl(user.getStudentCardUrl())
+                .studentCardUrl(cardUrl)
                 .rejectionReason(user.getRejectionReason())
                 .role(user.getRole())
                 .status(user.getStatus())
