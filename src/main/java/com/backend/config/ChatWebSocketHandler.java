@@ -173,9 +173,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR) {
             return true;
         }
-        boolean teamMember = teamMemberRepository.findByUser(user)
-                .map(member -> member.getTeam().getId().equals(team.getId()))
-                .orElse(false);
+        boolean teamMember = teamMemberRepository.findByTeamId(team.getId()).stream()
+                .anyMatch(member -> member.getUser() != null && member.getUser().getId().equals(user.getId()));
         boolean assignedMentor = team.getTrack() != null && matrixRepository.findByTrackId(team.getTrack().getId()).stream()
                 .anyMatch(matrix -> matrix.getMentors() != null
                         && matrix.getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId())));
