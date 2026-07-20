@@ -21,6 +21,11 @@ import com.backend.repository.TeamJoinRequestRepository;
 import com.backend.repository.TeamRepository;
 import com.backend.repository.TrackRepository;
 import com.backend.repository.UserRepository;
+import com.backend.repository.SubmissionRepository;
+import com.backend.repository.ChatMessageRepository;
+import com.backend.repository.ScoreRepository;
+import com.backend.repository.PrizeRepository;
+import com.backend.repository.AuditLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -40,7 +45,13 @@ public class TeamService {
     private final HackathonEventRepository eventRepository;
     private final TrackRepository trackRepository;
     private final NotificationRepository notificationRepository;
+    private final SubmissionRepository submissionRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ScoreRepository scoreRepository;
+    private final PrizeRepository prizeRepository;
+    private final AuditLogRepository auditLogRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
 
     @Transactional
     public TeamResponse createTeam(TeamCreateRequest request) {
@@ -65,6 +76,39 @@ public class TeamService {
             throw new AppException(ErrorCode.ALREADY_IN_TEAM);
         }
 
+        // Validate memberEmails (must invite at least 2 other members, unique, exists, not already in team)
+        List<String> emails = request.getMemberEmails();
+        if (emails == null) {
+            throw new RuntimeException("Bạn phải mời tối thiểu 2 thành viên khác khi tạo đội.");
+        }
+        List<String> uniqueEmails = emails.stream()
+                .filter(e -> e != null && !e.trim().isEmpty())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (uniqueEmails.size() < 2) {
+            throw new RuntimeException("Bạn phải mời tối thiểu 2 thành viên khác khi tạo đội.");
+        }
+        if (uniqueEmails.contains(currentUserEmail)) {
+            throw new RuntimeException("Không thể tự mời chính mình vào đội.");
+        }
+        if (uniqueEmails.size() > 4) {
+            throw new RuntimeException("Đội chỉ được có tối đa 5 thành viên (kể cả Trưởng nhóm).");
+        }
+
+        java.util.List<User> invitedUsers = new java.util.ArrayList<>();
+        for (String email : uniqueEmails) {
+            User user = userRepository.findByEmail(email)
+                    .orElse(null);
+            if (user == null || user.getStatus() != com.backend.entity.enums.AccountStatus.APPROVED) {
+                throw new RuntimeException("Không tìm thấy thành viên với email: " + email);
+            }
+            if (teamMemberRepository.existsByUserIdAndTeamEventId(user.getId(), event.getId())) {
+                throw new RuntimeException("Thành viên có email " + email + " đã ở trong một đội khác, không thể mời thành viên này và đội không thể thành lập!");
+            }
+            invitedUsers.add(user);
+        }
+
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         if (event.getRegStartDate() != null && now.isBefore(event.getRegStartDate())) {
             throw new RuntimeException("Sự kiện chưa mở cổng đăng ký (Thời gian đăng ký bắt đầu từ: " + event.getRegStartDate() + ")");
@@ -74,13 +118,13 @@ public class TeamService {
         }
 
         String rawPassword = request.getJoinPassword();
-        String encodedPassword = (rawPassword != null && !rawPassword.isBlank()) ? passwordEncoder.encode(rawPassword) : null;
+        String joinPassword = (rawPassword != null && !rawPassword.isBlank()) ? rawPassword : null;
 
         Team newTeam = Team.builder()
                 .name(request.getName())
                 .description(request.getDescription())
                 .type(request.getType())
-                .joinPassword(encodedPassword)
+                .joinPassword(joinPassword)
                 .event(event)
                 .track(track)
                 .build();
@@ -92,6 +136,24 @@ public class TeamService {
                 .role(MemberRole.LEADER)
                 .build();
         teamMemberRepository.save(leaderMember);
+
+        // Add invited members
+        for (User invitedUser : invitedUsers) {
+            TeamMember member = TeamMember.builder()
+                    .team(newTeam)
+                    .user(invitedUser)
+                    .role(MemberRole.MEMBER)
+                    .build();
+            teamMemberRepository.save(member);
+
+            notificationRepository.save(Notification.builder()
+                    .title("Bạn đã được mời vào đội " + newTeam.getName())
+                    .body(currentUser.getFullName() + " đã mời bạn tham gia đội. Mở trang Đội của tôi để xem chi tiết.")
+                    .recipient(invitedUser)
+                    .sender(currentUser)
+                    .actionUrl("/my-team")
+                    .build());
+        }
 
         return toTeamResponse(newTeam);
     }
@@ -114,6 +176,7 @@ public class TeamService {
         return toTeamResponse(myMembership.getTeam());
     }
 
+    @Transactional
     public void removeMember(Long teamId, Long memberId) {
         TeamMember leader = getCurrentMembership();
         if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
@@ -131,7 +194,35 @@ public class TeamService {
             throw new RuntimeException("Không thể xoá Team Leader hiện tại");
         }
 
-        teamMemberRepository.deleteById(memberId);
+        teamMemberRepository.delete(target);
+
+        // Notify target user
+        notificationRepository.save(Notification.builder()
+                .title("Bạn đã bị xóa khỏi đội")
+                .body("Bạn đã bị xóa khỏi đội " + leader.getTeam().getName() + ".")
+                .recipient(target.getUser())
+                .sender(leader.getUser())
+                .actionUrl("/my-team")
+                .build());
+
+        // Check if remaining size drops below 3
+        List<TeamMember> remainingMembers = teamMemberRepository.findByTeamId(teamId);
+        if (remainingMembers.size() < 3) {
+            disbandTeam(leader.getTeam());
+        } else {
+            // Notify other members
+            for (TeamMember m : remainingMembers) {
+                if (!m.getUser().getId().equals(leader.getUser().getId())) {
+                    notificationRepository.save(Notification.builder()
+                            .title("Thành viên bị xóa khỏi đội")
+                            .body(target.getUser().getFullName() + " đã bị xóa khỏi đội.")
+                            .recipient(m.getUser())
+                            .sender(leader.getUser())
+                            .actionUrl("/my-team")
+                            .build());
+                }
+            }
+        }
     }
 
     @Transactional
@@ -243,6 +334,22 @@ public class TeamService {
                 .status("PENDING")
                 .build();
         teamJoinRequestRepository.save(joinRequest);
+
+        // SEND NOTIFICATION TO TEAM LEADER
+        List<TeamMember> teamMembers = teamMemberRepository.findByTeamId(team.getId());
+        TeamMember leader = teamMembers.stream()
+                .filter(m -> m.getRole() == MemberRole.LEADER)
+                .findFirst()
+                .orElse(null);
+        if (leader != null) {
+            notificationRepository.save(Notification.builder()
+                    .title("Yêu cầu tham gia đội mới")
+                    .body(currentUser.getFullName() + " đã gửi yêu cầu gia nhập đội " + team.getName() + " của bạn.")
+                    .recipient(leader.getUser())
+                    .sender(currentUser)
+                    .actionUrl("/my-team")
+                    .build());
+        }
     }
 
     public List<TeamJoinRequestResponse> getPendingJoinRequests(Long teamId) {
@@ -330,7 +437,7 @@ public class TeamService {
             throw new AppException(ErrorCode.INVALID_JOIN_TYPE);
         }
 
-        if (team.getJoinPassword() == null || !passwordEncoder.matches(password, team.getJoinPassword())) {
+        if (team.getJoinPassword() == null || !password.equals(team.getJoinPassword())) {
             throw new AppException(ErrorCode.WRONG_JOIN_PASSWORD);
         }
 
@@ -352,12 +459,103 @@ public class TeamService {
             throw new RuntimeException("Đội đã đạt tối đa 5 thành viên");
         }
 
+        List<TeamMember> existingMembers = teamMemberRepository.findByTeamId(team.getId());
+
         TeamMember newMember = TeamMember.builder()
                 .team(team)
                 .user(currentUser)
                 .role(MemberRole.MEMBER)
                 .build();
         teamMemberRepository.save(newMember);
+
+        // SEND NOTIFICATION TO ALL EXISTING MEMBERS (INCLUDING LEADER)
+        for (TeamMember existing : existingMembers) {
+            notificationRepository.save(Notification.builder()
+                    .title("Thành viên mới gia nhập")
+                    .body(currentUser.getFullName() + " đã gia nhập đội " + team.getName() + " bằng mã PIN.")
+                    .recipient(existing.getUser())
+                    .sender(currentUser)
+                    .actionUrl("/my-team")
+                    .build());
+        }
+    }
+
+    @Transactional
+    public void disbandTeam(Team team) {
+        List<TeamMember> members = teamMemberRepository.findByTeamId(team.getId());
+        for (TeamMember member : members) {
+            notificationRepository.save(Notification.builder()
+                    .title("Giải tán đội " + team.getName())
+                    .body("Đội " + team.getName() + " đã bị giải tán do không còn đủ tối thiểu 3 thành viên.")
+                    .recipient(member.getUser())
+                    .actionUrl("/my-team")
+                    .build());
+        }
+
+        // Unlink prizes to avoid database constraint violations
+        List<com.backend.entity.Prize> prizes = prizeRepository.findByTeamId(team.getId());
+        for (com.backend.entity.Prize prize : prizes) {
+            prize.setTeam(null);
+            prizeRepository.save(prize);
+        }
+
+        // Delete submissions, scores, and their audit logs
+        List<com.backend.entity.Submission> submissions = submissionRepository.findByTeamId(team.getId());
+        for (com.backend.entity.Submission submission : submissions) {
+            List<com.backend.entity.Score> scores = scoreRepository.findBySubmissionId(submission.getId());
+            for (com.backend.entity.Score score : scores) {
+                List<com.backend.entity.AuditLog> logs = auditLogRepository.findByScoreId(score.getId());
+                auditLogRepository.deleteAll(logs);
+            }
+            scoreRepository.deleteAll(scores);
+        }
+        submissionRepository.deleteAll(submissions);
+
+        List<com.backend.entity.ChatMessage> chatMessages = chatMessageRepository.findByTeamIdOrderByCreatedAtAsc(team.getId());
+        chatMessageRepository.deleteAll(chatMessages);
+
+        List<com.backend.entity.TeamJoinRequest> joinRequests = teamJoinRequestRepository.findByTeamId(team.getId());
+        teamJoinRequestRepository.deleteAll(joinRequests);
+
+        teamMemberRepository.deleteAll(members);
+
+        teamRepository.delete(team);
+    }
+
+    @Transactional
+    public void leaveTeam() {
+        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        TeamMember myMembership = teamMemberRepository.findByUser(currentUser)
+                .orElseThrow(() -> new RuntimeException("Bạn không ở trong đội nào để rời."));
+
+        Team team = myMembership.getTeam();
+        List<TeamMember> members = teamMemberRepository.findByTeamId(team.getId());
+        int currentSize = members.size();
+
+        if (myMembership.getRole() == MemberRole.LEADER) {
+            throw new RuntimeException("Trưởng nhóm phải chuyển quyền Trưởng nhóm cho thành viên khác trước khi rời đội.");
+        }
+
+        teamMemberRepository.delete(myMembership);
+
+        for (TeamMember member : members) {
+            if (!member.getUser().getId().equals(currentUser.getId())) {
+                notificationRepository.save(Notification.builder()
+                        .title("Thành viên rời đội")
+                        .body(currentUser.getFullName() + " đã rời khỏi đội " + team.getName() + ".")
+                        .recipient(member.getUser())
+                        .sender(currentUser)
+                        .actionUrl("/my-team")
+                        .build());
+            }
+        }
+
+        if (currentSize - 1 < 3) {
+            disbandTeam(team);
+        }
     }
 
     private TeamResponse toTeamResponse(Team team) {
@@ -372,6 +570,9 @@ public class TeamService {
                 .map(m -> toMemberResponse(m, currentUser, isLobby))
                 .toList();
 
+        boolean isLeader = members.stream()
+                .anyMatch(m -> m.getEmail() != null && m.getEmail().equals(currentUserEmail) && m.getRole() == MemberRole.LEADER);
+
         return TeamResponse.builder()
                 .id(team.getId())
                 .name(team.getName())
@@ -383,6 +584,7 @@ public class TeamService {
                 .trackName(team.getTrack() == null ? null : team.getTrack().getName())
                 .members(members)
                 .memberCount(members.size())
+                .joinPassword(isLeader ? team.getJoinPassword() : null)
                 .build();
     }
 
