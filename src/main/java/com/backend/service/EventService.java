@@ -47,8 +47,49 @@ public class EventService {
     private final UserRepository userRepository;
     private final PrizeRepository prizeRepository;
 
+    private void validateEventRequest(EventRequest request) {
+        if (request.getRoundCount() == null) {
+            throw new RuntimeException("Số lượng vòng thi không được để trống");
+        }
+        if (request.getRoundCount() < 2) {
+            throw new RuntimeException("Giải đấu phải có ít nhất 2 vòng thi (Vòng loại và Vòng chung kết)");
+        }
+
+        if (request.getRegStartDate() == null) {
+            throw new RuntimeException("Thời gian bắt đầu đăng ký không được để trống");
+        }
+        if (request.getRegEndDate() == null) {
+            throw new RuntimeException("Thời gian kết thúc đăng ký không được để trống");
+        }
+        if (request.getEventStartDate() == null) {
+            throw new RuntimeException("Thời gian bắt đầu thi không được để trống");
+        }
+        if (request.getEventEndDate() == null) {
+            throw new RuntimeException("Thời gian kết thúc thi không được để trống");
+        }
+
+        if (request.getRegStartDate().isAfter(request.getRegEndDate())) {
+            throw new RuntimeException("Thời gian bắt đầu đăng ký phải trước thời gian kết thúc đăng ký");
+        }
+        if (request.getRegEndDate().isAfter(request.getEventStartDate())) {
+            throw new RuntimeException("Thời gian kết thúc đăng ký phải trước hoặc bằng thời gian bắt đầu thi");
+        }
+        if (request.getEventStartDate().isAfter(request.getEventEndDate())) {
+            throw new RuntimeException("Thời gian bắt đầu thi phải trước thời gian kết thúc giải đấu");
+        }
+
+        if (request.getSubmissionDeadline() != null) {
+            if (request.getSubmissionDeadline().isBefore(request.getEventStartDate()) 
+                    || request.getSubmissionDeadline().isAfter(request.getEventEndDate())) {
+                throw new RuntimeException("Hạn nộp bài mặc định phải nằm trong thời gian diễn ra giải đấu");
+            }
+        }
+    }
+
     @Transactional
     public EventResponse createEvent(EventRequest request) {
+        validateEventRequest(request);
+
         HackathonEvent newEvent = HackathonEvent.builder()
                 .name(request.getName())
                 .description(request.getDescription())
@@ -59,7 +100,7 @@ public class EventService {
                 .eventStartDate(request.getEventStartDate())
                 .eventEndDate(request.getEventEndDate())
                 .defaultSubmissionDeadline(request.getSubmissionDeadline())
-                .roundCount(request.getRoundCount() == null || request.getRoundCount() < 2 ? 2 : request.getRoundCount())
+                .roundCount(request.getRoundCount())
                 .structureInitialized(false)
                 .submissionFormSchema(request.getSubmissionFormSchema())
                 .competitionRules(request.getCompetitionRules())
@@ -77,8 +118,10 @@ public class EventService {
 
     @Transactional
     public EventResponse updateEvent(Long eventId, EventRequest request) {
+        validateEventRequest(request);
+
         HackathonEvent event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new RuntimeException("KhÃ´ng tÃ¬m tháº¥y giáº£i Ä‘áº¥u"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
 
         event.setName(request.getName());
         event.setDescription(request.getDescription());
@@ -89,7 +132,7 @@ public class EventService {
         event.setEventStartDate(request.getEventStartDate());
         event.setEventEndDate(request.getEventEndDate());
         event.setDefaultSubmissionDeadline(request.getSubmissionDeadline());
-        event.setRoundCount(request.getRoundCount() == null || request.getRoundCount() < 2 ? 2 : request.getRoundCount());
+        event.setRoundCount(request.getRoundCount());
         event.setSubmissionFormSchema(request.getSubmissionFormSchema());
         event.setCompetitionRules(request.getCompetitionRules());
         event.setRuleDocumentUrl(request.getRuleDocumentUrl());
