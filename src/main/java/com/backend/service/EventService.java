@@ -9,6 +9,7 @@ import com.backend.dto.response.MatrixResponse;
 import com.backend.dto.response.PrizeResponse;
 import com.backend.dto.response.RoundResponse;
 import com.backend.dto.response.TrackResponse;
+import com.backend.dto.response.PublicStaffResponse;
 import com.backend.dto.response.UserProfileResponse;
 import com.backend.entity.HackathonEvent;
 import com.backend.entity.Prize;
@@ -334,7 +335,7 @@ public class EventService {
                 .id(track.getId())
                 .name(track.getName())
                 .description(track.getDescription())
-                .mentors(track.getMentors() == null ? List.of() : track.getMentors().stream().map(this::toUserProfile).toList())
+                .mentors(track.getMentors() == null ? List.of() : track.getMentors().stream().map(this::toPublicStaff).toList())
                 .build();
     }
 
@@ -359,8 +360,8 @@ public class EventService {
                 .guidelineUrl(matrix.getGuidelineUrl())
                 .submissionDeadline(matrix.getSubmissionDeadline())
                 .scoringCriteriaJson(matrix.getScoringCriteriaJson())
-                .mentors(matrix.getMentors() == null ? List.of() : matrix.getMentors().stream().map(this::toUserProfile).toList())
-                .judges(matrix.getJudges() == null ? List.of() : matrix.getJudges().stream().map(this::toUserProfile).toList())
+                .mentors(matrix.getMentors() == null ? List.of() : matrix.getMentors().stream().map(this::toPublicStaff).toList())
+                .judges(matrix.getJudges() == null ? List.of() : matrix.getJudges().stream().map(this::toPublicStaff).toList())
                 .build();
     }
 
@@ -383,6 +384,14 @@ public class EventService {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .status(user.getStatus())
+                .build();
+    }
+
+    private PublicStaffResponse toPublicStaff(User user) {
+        return PublicStaffResponse.builder()
+                .id(user.getId())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
                 .build();
     }
 
