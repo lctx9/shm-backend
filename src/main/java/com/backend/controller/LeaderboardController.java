@@ -8,6 +8,7 @@ import com.backend.entity.TeamMember;
 import com.backend.entity.User;
 import com.backend.entity.HackathonEvent;
 import com.backend.entity.enums.RoleType;
+import com.backend.repository.HackathonEventRepository;
 import com.backend.repository.SubmissionRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.UserRepository;
@@ -16,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -32,9 +34,24 @@ public class LeaderboardController {
     private final SubmissionRepository submissionRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
+    private final HackathonEventRepository eventRepository;
 
     @GetMapping
-    public ApiResponse<List<LeaderboardResponse>> getLeaderboard() {
+    public ApiResponse<List<LeaderboardResponse>> getLeaderboard(@RequestParam(required = false) Long eventId) {
+        Long targetEventId = eventId;
+        if (targetEventId == null) {
+            targetEventId = getDefaultEventId();
+        }
+
+        if (targetEventId == null) {
+            return ApiResponse.<List<LeaderboardResponse>>builder()
+                    .result(new ArrayList<>())
+                    .build();
+        }
+
+        HackathonEvent event = eventRepository.findById(targetEventId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
+
         boolean showUnpublished = false;
         org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
@@ -48,29 +65,34 @@ public class LeaderboardController {
             }
         }
 
+        if (!Boolean.TRUE.equals(event.getResultsPublished()) && !showUnpublished) {
+            return ApiResponse.<List<LeaderboardResponse>>builder()
+                    .result(new ArrayList<>())
+                    .build();
+        }
+
+        List<Submission> submissions = submissionRepository.findFinalRoundGradedSubmissions(targetEventId);
+
+        List<Submission> sortedSubmissions = submissions.stream()
+                .sorted((s1, s2) -> {
+                    double score1 = s1.getScore() != null ? s1.getScore() : 0.0;
+                    double score2 = s2.getScore() != null ? s2.getScore() : 0.0;
+                    int scoreCompare = Double.compare(score2, score1);
+                    if (scoreCompare != 0) {
+                        return scoreCompare;
+                    }
+                    if (s1.getCreatedAt() == null && s2.getCreatedAt() == null) return 0;
+                    if (s1.getCreatedAt() == null) return 1;
+                    if (s2.getCreatedAt() == null) return -1;
+                    return s1.getCreatedAt().compareTo(s2.getCreatedAt());
+                })
+                .toList();
+
         AtomicInteger rank = new AtomicInteger(1);
         List<LeaderboardResponse> rows = new ArrayList<>();
-        final boolean finalShowUnpublished = showUnpublished;
 
-        for (Submission submission : submissionRepository.findByIsGradedTrueOrderByScoreDesc()) {
-            HackathonEvent event = submission.getTeam() == null || submission.getTeam().getEvent() == null 
-                    ? null 
-                    : submission.getTeam().getEvent();
-            if (event == null) continue;
-
-            // If results are not published and user is not Coordinator/Admin, skip
-            if (!Boolean.TRUE.equals(event.getResultsPublished()) && !finalShowUnpublished) {
-                continue;
-            }
-
-            String trackName = "Chưa gắn track";
-            if (submission.getMatrix() != null) {
-                if (submission.getMatrix().getTrack() == null) {
-                    trackName = "Chung kết";
-                } else {
-                    trackName = submission.getMatrix().getTrack().getName();
-                }
-            }
+        for (Submission submission : sortedSubmissions) {
+            String trackName = "Chung kết";
 
             rows.add(LeaderboardResponse.builder()
                     .id(submission.getId())
@@ -92,6 +114,20 @@ public class LeaderboardController {
         return ApiResponse.<List<LeaderboardResponse>>builder()
                 .result(rows)
                 .build();
+    }
+
+    private Long getDefaultEventId() {
+        List<HackathonEvent> activeEvents = eventRepository.findByIsActiveTrue();
+        if (!activeEvents.isEmpty()) {
+            activeEvents.sort((e1, e2) -> e2.getId().compareTo(e1.getId()));
+            return activeEvents.get(0).getId();
+        }
+        List<HackathonEvent> allEvents = eventRepository.findAll();
+        if (!allEvents.isEmpty()) {
+            allEvents.sort((e1, e2) -> e2.getId().compareTo(e1.getId()));
+            return allEvents.get(0).getId();
+        }
+        return null;
     }
 
     private TeamMemberResponse toMemberResponse(TeamMember member) {
