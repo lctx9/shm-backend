@@ -22,7 +22,56 @@ public enum ErrorCode {
     WRONG_JOIN_PASSWORD(1010, "Mật khẩu gia nhập đội thi không chính xác", HttpStatus.BAD_REQUEST),
     VALIDATION_ERROR(1011, "Dữ liệu đầu vào không hợp lệ", HttpStatus.BAD_REQUEST),
     BUSINESS_ERROR(1012, "Lỗi nghiệp vụ phát sinh", HttpStatus.BAD_REQUEST),
-    DATABASE_ERROR(1013, "Lỗi ràng buộc hoặc trùng lặp dữ liệu cơ sở dữ liệu", HttpStatus.CONFLICT);
+    DATABASE_ERROR(1013, "Lỗi ràng buộc hoặc trùng lặp dữ liệu cơ sở dữ liệu", HttpStatus.CONFLICT),
+
+    // ==========================================
+    // MÃ LỖI XÁC THỰC & TÀI KHOẢN
+    // ==========================================
+    ACCOUNT_NOT_APPROVED(1014, "Tài khoản chưa được duyệt hoặc đã bị khóa", HttpStatus.FORBIDDEN),
+    MAINTENANCE_MODE(1015, "Hệ thống đang bảo trì. Vui lòng quay lại sau.", HttpStatus.SERVICE_UNAVAILABLE),
+    REGISTRATION_DISABLED(1016, "Hệ thống đang tạm đóng đăng ký tài khoản mới", HttpStatus.FORBIDDEN),
+    OTP_REQUIRED(1017, "Vui lòng nhập mã OTP đã gửi qua email.", HttpStatus.BAD_REQUEST),
+    OTP_NOT_REQUESTED(1018, "Bạn chưa yêu cầu mã OTP hoặc mã đã hết hạn.", HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(1019, "Mã OTP đã hết hạn. Vui lòng gửi lại mã mới.", HttpStatus.BAD_REQUEST),
+    OTP_INVALID(1020, "Mã OTP không đúng.", HttpStatus.BAD_REQUEST),
+    EMAIL_SEND_FAILED(1021, "Không thể gửi email. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    // ==========================================
+    // MÃ LỖI GIẢI ĐẤU & CẤU TRÚC
+    // ==========================================
+    EVENT_NOT_FOUND(1022, "Không tìm thấy giải đấu", HttpStatus.NOT_FOUND),
+    TRACK_NOT_FOUND(1023, "Không tìm thấy hạng mục thi", HttpStatus.NOT_FOUND),
+    MATRIX_NOT_FOUND(1024, "Không tìm thấy vòng đấu trong ma trận", HttpStatus.NOT_FOUND),
+    PRIZE_NOT_FOUND(1025, "Không tìm thấy giải thưởng", HttpStatus.NOT_FOUND),
+
+    // ==========================================
+    // MÃ LỖI ĐĂNG KÝ ĐỘI & THAM GIA
+    // ==========================================
+    TEAM_FULL(1026, "Đội đã đạt tối đa 5 thành viên", HttpStatus.BAD_REQUEST),
+    NOT_TEAM_LEADER(1027, "Chỉ Team Leader mới có quyền thực hiện thao tác này", HttpStatus.FORBIDDEN),
+    JOIN_REQUEST_NOT_FOUND(1028, "Không tìm thấy yêu cầu tham gia đội", HttpStatus.NOT_FOUND),
+    REGISTRATION_PERIOD_CLOSED(1029, "Thời gian đăng ký đội đã kết thúc hoặc chưa bắt đầu", HttpStatus.BAD_REQUEST),
+
+    // ==========================================
+    // MÃ LỖI NỘP BÀI & CHẤM ĐIỂM
+    // ==========================================
+    SUBMISSION_NOT_FOUND(1030, "Không tìm thấy bài nộp", HttpStatus.NOT_FOUND),
+    SUBMISSION_DEADLINE_PASSED(1031, "Thời hạn nộp bài đã kết thúc", HttpStatus.BAD_REQUEST),
+    SUBMISSION_ALREADY_EXISTS(1032, "Đội thi đã nộp bài cho vòng thi này rồi", HttpStatus.CONFLICT),
+    JUDGE_NOT_ASSIGNED(1033, "Bạn chưa được phân công làm giám khảo cho vòng đấu này", HttpStatus.FORBIDDEN),
+    EDIT_REASON_REQUIRED(1034, "Phải cung cấp lý do khi sửa điểm", HttpStatus.BAD_REQUEST),
+    INVALID_SCORE_RANGE(1035, "Điểm số phải nằm trong khoảng từ 0 đến 100", HttpStatus.BAD_REQUEST),
+    SCORE_REQUIRED(1036, "Phải nhập điểm chấm", HttpStatus.BAD_REQUEST),
+    INVALID_CRITERIA_WEIGHT(1037, "Tổng trọng số tiêu chí phải lớn hơn 0", HttpStatus.BAD_REQUEST),
+    INVALID_CRITERIA_SCORE(1038, "Điểm thành phần phải nằm trong khoảng từ 0 đến 100", HttpStatus.BAD_REQUEST),
+    CRITERIA_SCORE_PARSE_FAILED(1039, "Không thể tính điểm từ cấu trúc tiêu chí", HttpStatus.BAD_REQUEST),
+
+    // ==========================================
+    // MÃ LỖI NHẬP LIỆU KHÔNG HỢP LỆ
+    // ==========================================
+    INVALID_ENUM_VALUE(1040, "Giá trị không hợp lệ cho trường dữ liệu này", HttpStatus.BAD_REQUEST),
+    INVALID_REQUEST_FORMAT(1041, "Định dạng dữ liệu gửi lên không hợp lệ", HttpStatus.BAD_REQUEST),
+    RESOURCE_NOT_FOUND(1042, "Không tìm thấy tài nguyên yêu cầu", HttpStatus.NOT_FOUND);
 
     private final int code;
     private final String message;

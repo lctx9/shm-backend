@@ -10,6 +10,8 @@ import com.backend.entity.TrackRoundMatrix;
 import com.backend.entity.User;
 import com.backend.entity.enums.RoleType;
 import com.backend.entity.enums.MemberRole;
+import com.backend.exception.AppException;
+import com.backend.exception.ErrorCode;
 import com.backend.repository.SubmissionRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TeamRepository;
@@ -35,23 +37,23 @@ public class SubmissionService {
 
     public SubmissionResponse submitWork(SubmissionRequest request) {
         Team team = teamRepository.findById(request.getTeamId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đội thi"));
+                .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
         TrackRoundMatrix matrix = matrixRepository.findById(request.getMatrixId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy vòng thi"));
+                .orElseThrow(() -> new AppException(ErrorCode.MATRIX_NOT_FOUND));
 
         requireTeamLeader(team.getId());
 
         if (matrix.getTrack() != null && (team.getTrack() == null || !team.getTrack().getId().equals(matrix.getTrack().getId()))) {
-            throw new RuntimeException("Vòng thi không thuộc hạng mục của đội");
+            throw new AppException(ErrorCode.BUSINESS_ERROR);
         }
 
         if (submissionRepository.existsByTeamIdAndMatrixId(team.getId(), matrix.getId())) {
-            throw new RuntimeException("Đội thi đã nộp bài cho vòng thi này rồi");
+            throw new AppException(ErrorCode.SUBMISSION_ALREADY_EXISTS);
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
-            throw new RuntimeException("Hạn nộp bài cho vòng thi này đã kết thúc (Hạn chót: " + matrix.getSubmissionDeadline() + ")");
+            throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }
 
         Submission submission = Submission.builder()
@@ -79,22 +81,22 @@ public class SubmissionService {
 
     public SubmissionResponse updateSubmission(Long id, SubmissionRequest request) {
         Submission submission = submissionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy bài nộp"));
+                .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));
         TrackRoundMatrix matrix = matrixRepository.findById(request.getMatrixId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy vòng thi"));
+                .orElseThrow(() -> new AppException(ErrorCode.MATRIX_NOT_FOUND));
 
         if (submission.getTeam() == null || !submission.getTeam().getId().equals(request.getTeamId())) {
-            throw new RuntimeException("Bài nộp không thuộc đội đã chọn");
+            throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         requireTeamLeader(submission.getTeam().getId());
 
         if (matrix.getTrack() != null && (submission.getTeam().getTrack() == null || !submission.getTeam().getTrack().getId().equals(matrix.getTrack().getId()))) {
-            throw new RuntimeException("Vòng thi không thuộc hạng mục của đội");
+            throw new AppException(ErrorCode.BUSINESS_ERROR);
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
-            throw new RuntimeException("Hạn nộp bài cho vòng thi này đã kết thúc (Hạn chót: " + matrix.getSubmissionDeadline() + ")");
+            throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }
 
         submission.setMatrix(matrix);
@@ -128,7 +130,7 @@ public class SubmissionService {
     private User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
     }
 
     private boolean isAssignedToMatrix(User user, TrackRoundMatrix matrix) {
@@ -140,9 +142,9 @@ public class SubmissionService {
 
     private void requireTeamLeader(Long teamId) {
         TeamMember membership = teamMemberRepository.findByUser(getCurrentUser())
-                .orElseThrow(() -> new RuntimeException("Bạn chưa tham gia đội thi"));
+                .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
         if (!membership.getTeam().getId().equals(teamId) || membership.getRole() != MemberRole.LEADER) {
-            throw new RuntimeException("Chỉ Leader của đội mới được nộp hoặc cập nhật bài");
+            throw new AppException(ErrorCode.NOT_TEAM_LEADER);
         }
     }
 

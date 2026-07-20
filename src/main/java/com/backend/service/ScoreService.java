@@ -7,6 +7,8 @@ import com.backend.entity.Submission;
 import com.backend.entity.User;
 import com.backend.entity.TrackRoundMatrix;
 import com.backend.entity.enums.RoleType;
+import com.backend.exception.AppException;
+import com.backend.exception.ErrorCode;
 import com.backend.repository.AuditLogRepository;
 import com.backend.repository.ScoreRepository;
 import com.backend.repository.SubmissionRepository;
@@ -38,17 +40,17 @@ public class ScoreService {
     public Score gradeSubmission(ScoreRequest request) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User judge = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Khong tim thay giam khao"));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         Submission submission = submissionRepository.findById(request.getSubmissionId())
-                .orElseThrow(() -> new RuntimeException("Khong tim thay bai nop"));
+                .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));
 
         boolean manager = judge.getRole() == RoleType.ADMIN || judge.getRole() == RoleType.COORDINATOR;
         boolean assignedJudge = submission.getMatrix() != null
                 && submission.getMatrix().getJudges() != null
                 && submission.getMatrix().getJudges().stream().anyMatch(user -> user.getId().equals(judge.getId()));
         if (!manager && !assignedJudge) {
-            throw new RuntimeException("Bạn chưa được phân công làm giám khảo cho vòng đấu này");
+            throw new AppException(ErrorCode.JUDGE_NOT_ASSIGNED);
         }
 
         Double finalScore = resolveScore(request);
@@ -61,7 +63,7 @@ public class ScoreService {
             Double oldScoreValue = existingScore.getScoreValue();
 
             if (request.getEditReason() == null || request.getEditReason().isBlank()) {
-                throw new RuntimeException("Phai cung cap ly do khi sua diem");
+                throw new AppException(ErrorCode.EDIT_REASON_REQUIRED);
             }
 
             AuditLog auditLog = AuditLog.builder()
@@ -155,12 +157,12 @@ public class ScoreService {
     private Double resolveScore(ScoreRequest request) {
         if (request.getScoreValue() != null) {
             if (request.getScoreValue() < 0.0 || request.getScoreValue() > 100.0) {
-                throw new RuntimeException("Điểm số phải nằm trong khoảng từ 0 đến 100");
+                throw new AppException(ErrorCode.INVALID_SCORE_RANGE);
             }
             return request.getScoreValue();
         }
         if (request.getCriteriaScoresJson() == null || request.getCriteriaScoresJson().isBlank()) {
-            throw new RuntimeException("Phai nhap diem cham");
+            throw new AppException(ErrorCode.SCORE_REQUIRED);
         }
 
         try {
@@ -172,7 +174,7 @@ public class ScoreService {
                 for (JsonNode item : root) {
                     double score = item.path("score").asDouble(0);
                     if (score < 0.0 || score > 100.0) {
-                        throw new RuntimeException("Điểm thành phần phải nằm trong khoảng từ 0 đến 100");
+                        throw new AppException(ErrorCode.INVALID_CRITERIA_SCORE);
                     }
                     double weight = item.path("weight").asDouble(1);
                     weightedSum += score * weight;
@@ -181,14 +183,13 @@ public class ScoreService {
             }
 
             if (totalWeight <= 0) {
-                throw new RuntimeException("Tong trong so tieu chi phai lon hon 0");
+                throw new AppException(ErrorCode.INVALID_CRITERIA_WEIGHT);
             }
             return Math.round((weightedSum / totalWeight) * 10.0) / 10.0;
+        } catch (AppException ex) {
+            throw ex;
         } catch (Exception ex) {
-            if (ex instanceof RuntimeException) {
-                throw (RuntimeException) ex;
-            }
-            throw new RuntimeException("Khong the tinh diem tu cau truc tieu chi");
+            throw new AppException(ErrorCode.CRITERIA_SCORE_PARSE_FAILED);
         }
     }
 }
