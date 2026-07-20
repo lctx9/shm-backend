@@ -116,4 +116,15 @@ public class TeamController {
                 .result("Gia nhập đội thành công!")
                 .build();
     }
+
+    // 3. Rời khỏi đội
+    @PostMapping("/leave")
+    @PreAuthorize("hasRole('USER')")
+    public ApiResponse<String> leaveTeam() {
+        teamService.leaveTeam();
+        return ApiResponse.<String>builder()
+                .result("Rời đội thành công!")
+                .build();
+    }
 }
+
