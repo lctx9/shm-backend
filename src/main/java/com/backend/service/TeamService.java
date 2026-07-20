@@ -97,7 +97,7 @@ public class TeamService {
     }
 
     public List<TeamResponse> getAllTeams() {
-        return teamRepository.findAll().stream().map(this::toTeamResponse).toList();
+        return teamRepository.findAll().stream().map(t -> toTeamResponse(t, true)).toList();
     }
 
     public TeamResponse getMyTeam() {
@@ -361,11 +361,15 @@ public class TeamService {
     }
 
     private TeamResponse toTeamResponse(Team team) {
+        return toTeamResponse(team, false);
+    }
+
+    private TeamResponse toTeamResponse(Team team, boolean isLobby) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail).orElse(null);
 
         List<TeamMemberResponse> members = teamMemberRepository.findByTeamId(team.getId()).stream()
-                .map(m -> toMemberResponse(m, currentUser))
+                .map(m -> toMemberResponse(m, currentUser, isLobby))
                 .toList();
 
         return TeamResponse.builder()
@@ -382,7 +386,7 @@ public class TeamService {
                 .build();
     }
 
-    private TeamMemberResponse toMemberResponse(TeamMember member, User currentUser) {
+    private TeamMemberResponse toMemberResponse(TeamMember member, User currentUser, boolean isLobby) {
         User user = member.getUser();
         boolean isStaffOrAdmin = currentUser != null && (
                 currentUser.getRole() == com.backend.entity.enums.RoleType.ADMIN || 
@@ -391,7 +395,7 @@ public class TeamService {
                 currentUser.getRole() == com.backend.entity.enums.RoleType.JUDGE
         );
         boolean isSameTeam = false;
-        if (currentUser != null) {
+        if (!isLobby && currentUser != null) {
             Optional<TeamMember> currentMembership = teamMemberRepository.findByUser(currentUser);
             if (currentMembership.isPresent() && currentMembership.get().getTeam().getId().equals(member.getTeam().getId())) {
                 isSameTeam = true;
