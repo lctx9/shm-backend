@@ -15,5 +15,5 @@ public class TrackResponse {
     private Long id;
     private String name;
     private String description;
-    private List<UserProfileResponse> mentors;
+    private List<PublicStaffResponse> mentors;
 }
