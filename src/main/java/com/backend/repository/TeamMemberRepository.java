@@ -17,4 +17,6 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
 
     // Kiểm tra xem User này đã có đội chưa
     boolean existsByUser(User user);
+    boolean existsByUserIdAndTeamEventId(Long userId, Long eventId);
+    Optional<TeamMember> findByUserIdAndTeamEventId(Long userId, Long eventId);
 }

@@ -88,7 +88,16 @@ public class ScoreService {
             savedScore = scoreRepository.save(newScore);
         }
 
-        submission.setScore(finalScore);
+        // Calculate average score of all judges for this submission
+        double avgScore = scoreRepository.findBySubmissionId(submission.getId()).stream()
+                .map(Score::getScoreValue)
+                .filter(java.util.Objects::nonNull)
+                .mapToDouble(Double::doubleValue)
+                .average()
+                .orElse(0.0);
+        avgScore = Math.round(avgScore * 10.0) / 10.0;
+
+        submission.setScore(avgScore);
         submission.setCriteriaScoresJson(request.getCriteriaScoresJson());
         submission.setFeedback(request.getComment());
         submission.setIsGraded(true);
@@ -145,6 +154,9 @@ public class ScoreService {
 
     private Double resolveScore(ScoreRequest request) {
         if (request.getScoreValue() != null) {
+            if (request.getScoreValue() < 0.0 || request.getScoreValue() > 100.0) {
+                throw new RuntimeException("Điểm số phải nằm trong khoảng từ 0 đến 100");
+            }
             return request.getScoreValue();
         }
         if (request.getCriteriaScoresJson() == null || request.getCriteriaScoresJson().isBlank()) {
@@ -159,6 +171,9 @@ public class ScoreService {
             if (root.isArray()) {
                 for (JsonNode item : root) {
                     double score = item.path("score").asDouble(0);
+                    if (score < 0.0 || score > 100.0) {
+                        throw new RuntimeException("Điểm thành phần phải nằm trong khoảng từ 0 đến 100");
+                    }
                     double weight = item.path("weight").asDouble(1);
                     weightedSum += score * weight;
                     totalWeight += weight;
@@ -170,6 +185,9 @@ public class ScoreService {
             }
             return Math.round((weightedSum / totalWeight) * 10.0) / 10.0;
         } catch (Exception ex) {
+            if (ex instanceof RuntimeException) {
+                throw (RuntimeException) ex;
+            }
             throw new RuntimeException("Khong the tinh diem tu cau truc tieu chi");
         }
     }

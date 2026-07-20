@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ public class TeamService {
     private final HackathonEventRepository eventRepository;
     private final TrackRepository trackRepository;
     private final NotificationRepository notificationRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @Transactional
     public TeamResponse createTeam(TeamCreateRequest request) {
@@ -50,10 +52,6 @@ public class TeamService {
             throw new AppException(ErrorCode.TEAM_EXISTED);
         }
 
-        if (teamMemberRepository.existsByUser(currentUser)) {
-            throw new AppException(ErrorCode.ALREADY_IN_TEAM);
-        }
-
         HackathonEvent event = eventRepository.findById(request.getEventId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
         Track track = trackRepository.findById(request.getTrackId())
@@ -63,11 +61,26 @@ public class TeamService {
             throw new RuntimeException("Hạng mục thi không thuộc giải đấu đã chọn");
         }
 
+        if (teamMemberRepository.existsByUserIdAndTeamEventId(currentUser.getId(), event.getId())) {
+            throw new AppException(ErrorCode.ALREADY_IN_TEAM);
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (event.getRegStartDate() != null && now.isBefore(event.getRegStartDate())) {
+            throw new RuntimeException("Sự kiện chưa mở cổng đăng ký (Thời gian đăng ký bắt đầu từ: " + event.getRegStartDate() + ")");
+        }
+        if (event.getRegEndDate() != null && now.isAfter(event.getRegEndDate())) {
+            throw new RuntimeException("Sự kiện đã đóng cổng đăng ký (Thời gian đăng ký kết thúc vào: " + event.getRegEndDate() + ")");
+        }
+
+        String rawPassword = request.getJoinPassword();
+        String encodedPassword = (rawPassword != null && !rawPassword.isBlank()) ? passwordEncoder.encode(rawPassword) : null;
+
         Team newTeam = Team.builder()
                 .name(request.getName())
                 .description(request.getDescription())
                 .type(request.getType())
-                .joinPassword(request.getJoinPassword())
+                .joinPassword(encodedPassword)
                 .event(event)
                 .track(track)
                 .build();
@@ -131,8 +144,22 @@ public class TeamService {
         User invitedUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy email thành viên"));
 
-        if (teamMemberRepository.existsByUser(invitedUser)) {
+        HackathonEvent event = leader.getTeam().getEvent();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (event.getRegStartDate() != null && now.isBefore(event.getRegStartDate())) {
+            throw new RuntimeException("Sự kiện chưa mở cổng đăng ký (Thời gian đăng ký bắt đầu từ: " + event.getRegStartDate() + ")");
+        }
+        if (event.getRegEndDate() != null && now.isAfter(event.getRegEndDate())) {
+            throw new RuntimeException("Sự kiện đã đóng cổng đăng ký (Thời gian đăng ký kết thúc vào: " + event.getRegEndDate() + ")");
+        }
+
+        if (teamMemberRepository.existsByUserIdAndTeamEventId(invitedUser.getId(), event.getId())) {
             throw new AppException(ErrorCode.ALREADY_IN_TEAM);
+        }
+
+        long memberCount = teamMemberRepository.countByTeamId(leader.getTeam().getId());
+        if (memberCount >= 5) {
+            throw new RuntimeException("Đội đã đạt tối đa 5 thành viên");
         }
 
         teamMemberRepository.save(TeamMember.builder()
@@ -188,8 +215,22 @@ public class TeamService {
             throw new AppException(ErrorCode.INVALID_JOIN_TYPE);
         }
 
-        if (teamMemberRepository.existsByUser(currentUser)) {
+        HackathonEvent event = team.getEvent();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (event.getRegStartDate() != null && now.isBefore(event.getRegStartDate())) {
+            throw new RuntimeException("Sự kiện chưa mở cổng đăng ký (Thời gian đăng ký bắt đầu từ: " + event.getRegStartDate() + ")");
+        }
+        if (event.getRegEndDate() != null && now.isAfter(event.getRegEndDate())) {
+            throw new RuntimeException("Sự kiện đã đóng cổng đăng ký (Thời gian đăng ký kết thúc vào: " + event.getRegEndDate() + ")");
+        }
+
+        if (teamMemberRepository.existsByUserIdAndTeamEventId(currentUser.getId(), event.getId())) {
             throw new AppException(ErrorCode.ALREADY_IN_TEAM);
+        }
+
+        long memberCount = teamMemberRepository.countByTeamId(team.getId());
+        if (memberCount >= 5) {
+            throw new RuntimeException("Đội đã đạt tối đa 5 thành viên");
         }
 
         if (teamJoinRequestRepository.existsByTeamAndUserAndStatus(team, currentUser, "PENDING")) {
@@ -229,8 +270,22 @@ public class TeamService {
             throw new RuntimeException("Yêu cầu tham gia không hợp lệ");
         }
 
-        if (teamMemberRepository.existsByUser(joinRequest.getUser())) {
+        HackathonEvent event = leader.getTeam().getEvent();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (event.getRegStartDate() != null && now.isBefore(event.getRegStartDate())) {
+            throw new RuntimeException("Sự kiện chưa mở cổng đăng ký (Thời gian đăng ký bắt đầu từ: " + event.getRegStartDate() + ")");
+        }
+        if (event.getRegEndDate() != null && now.isAfter(event.getRegEndDate())) {
+            throw new RuntimeException("Sự kiện đã đóng cổng đăng ký (Thời gian đăng ký kết thúc vào: " + event.getRegEndDate() + ")");
+        }
+
+        if (teamMemberRepository.existsByUserIdAndTeamEventId(joinRequest.getUser().getId(), event.getId())) {
             throw new AppException(ErrorCode.ALREADY_IN_TEAM);
+        }
+
+        long memberCount = teamMemberRepository.countByTeamId(leader.getTeam().getId());
+        if (memberCount >= 5) {
+            throw new RuntimeException("Đội đã đạt tối đa 5 thành viên");
         }
 
         teamMemberRepository.save(TeamMember.builder()
@@ -275,12 +330,26 @@ public class TeamService {
             throw new AppException(ErrorCode.INVALID_JOIN_TYPE);
         }
 
-        if (team.getJoinPassword() == null || !team.getJoinPassword().equals(password)) {
+        if (team.getJoinPassword() == null || !passwordEncoder.matches(password, team.getJoinPassword())) {
             throw new AppException(ErrorCode.WRONG_JOIN_PASSWORD);
         }
 
-        if (teamMemberRepository.existsByUser(currentUser)) {
+        HackathonEvent event = team.getEvent();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (event.getRegStartDate() != null && now.isBefore(event.getRegStartDate())) {
+            throw new RuntimeException("Sự kiện chưa mở cổng đăng ký (Thời gian đăng ký bắt đầu từ: " + event.getRegStartDate() + ")");
+        }
+        if (event.getRegEndDate() != null && now.isAfter(event.getRegEndDate())) {
+            throw new RuntimeException("Sự kiện đã đóng cổng đăng ký (Thời gian đăng ký kết thúc vào: " + event.getRegEndDate() + ")");
+        }
+
+        if (teamMemberRepository.existsByUserIdAndTeamEventId(currentUser.getId(), event.getId())) {
             throw new AppException(ErrorCode.ALREADY_IN_TEAM);
+        }
+
+        long memberCount = teamMemberRepository.countByTeamId(team.getId());
+        if (memberCount >= 5) {
+            throw new RuntimeException("Đội đã đạt tối đa 5 thành viên");
         }
 
         TeamMember newMember = TeamMember.builder()
@@ -292,8 +361,11 @@ public class TeamService {
     }
 
     private TeamResponse toTeamResponse(Team team) {
+        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByEmail(currentUserEmail).orElse(null);
+
         List<TeamMemberResponse> members = teamMemberRepository.findByTeamId(team.getId()).stream()
-                .map(this::toMemberResponse)
+                .map(m -> toMemberResponse(m, currentUser))
                 .toList();
 
         return TeamResponse.builder()
@@ -310,14 +382,30 @@ public class TeamService {
                 .build();
     }
 
-    private TeamMemberResponse toMemberResponse(TeamMember member) {
+    private TeamMemberResponse toMemberResponse(TeamMember member, User currentUser) {
         User user = member.getUser();
+        boolean isStaffOrAdmin = currentUser != null && (
+                currentUser.getRole() == com.backend.entity.enums.RoleType.ADMIN || 
+                currentUser.getRole() == com.backend.entity.enums.RoleType.COORDINATOR || 
+                currentUser.getRole() == com.backend.entity.enums.RoleType.MENTOR || 
+                currentUser.getRole() == com.backend.entity.enums.RoleType.JUDGE
+        );
+        boolean isSameTeam = false;
+        if (currentUser != null) {
+            Optional<TeamMember> currentMembership = teamMemberRepository.findByUser(currentUser);
+            if (currentMembership.isPresent() && currentMembership.get().getTeam().getId().equals(member.getTeam().getId())) {
+                isSameTeam = true;
+            }
+        }
+
+        boolean showPrivateDetails = isStaffOrAdmin || isSameTeam;
+
         return TeamMemberResponse.builder()
                 .id(member.getId())
                 .userId(user.getId())
                 .fullName(user.getFullName())
-                .email(user.getEmail())
-                .studentId(user.getStudentId())
+                .email(showPrivateDetails ? user.getEmail() : null)
+                .studentId(showPrivateDetails ? user.getStudentId() : null)
                 .universityName(user.getUniversityName())
                 .role(member.getRole())
                 .build();

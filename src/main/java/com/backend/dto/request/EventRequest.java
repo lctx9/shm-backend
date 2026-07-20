@@ -23,4 +23,5 @@ public class EventRequest {
     private String competitionRules;
     private String ruleDocumentUrl;
     private Boolean active;
+    private Boolean resultsPublished;
 }

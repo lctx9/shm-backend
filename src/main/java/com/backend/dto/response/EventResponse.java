@@ -27,6 +27,7 @@ public class EventResponse {
     private Integer roundCount;
     private boolean structureInitialized;
     private boolean active;
+    private boolean resultsPublished;
     private String submissionFormSchema;
     private String competitionRules;
     private String ruleDocumentUrl;

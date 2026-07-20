@@ -15,7 +15,9 @@ import java.util.Date;
 @Slf4j
 @RequiredArgsConstructor
 public class JwtProvider {
-    private static final String SECRET_KEY = "DayLaMotKhoaBiMatRatDaiVaAnToanChoViecKiemTraChuKyCuaJSONWebTokenZXY";
+    @org.springframework.beans.factory.annotation.Value("${seal.jwt.secret:DayLaMotKhoaBiMatRatDaiVaAnToanChoViecKiemTraChuKyCuaJSONWebTokenZXY}")
+    private String secretKey;
+
     private final SystemConfigurationService systemConfigurationService;
 
     public String generateToken(String email) {
@@ -49,6 +51,6 @@ public class JwtProvider {
     }
 
     private Key getSignInKey() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(SECRET_KEY));
+        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey));
     }
 }

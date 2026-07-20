@@ -41,8 +41,17 @@ public class SubmissionService {
 
         requireTeamLeader(team.getId());
 
-        if (team.getTrack() == null || !team.getTrack().getId().equals(matrix.getTrack().getId())) {
+        if (matrix.getTrack() != null && (team.getTrack() == null || !team.getTrack().getId().equals(matrix.getTrack().getId()))) {
             throw new RuntimeException("Vòng thi không thuộc hạng mục của đội");
+        }
+
+        if (submissionRepository.existsByTeamIdAndMatrixId(team.getId(), matrix.getId())) {
+            throw new RuntimeException("Đội thi đã nộp bài cho vòng thi này rồi");
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
+            throw new RuntimeException("Hạn nộp bài cho vòng thi này đã kết thúc (Hạn chót: " + matrix.getSubmissionDeadline() + ")");
         }
 
         Submission submission = Submission.builder()
@@ -78,6 +87,16 @@ public class SubmissionService {
             throw new RuntimeException("Bài nộp không thuộc đội đã chọn");
         }
         requireTeamLeader(submission.getTeam().getId());
+
+        if (matrix.getTrack() != null && (submission.getTeam().getTrack() == null || !submission.getTeam().getTrack().getId().equals(matrix.getTrack().getId()))) {
+            throw new RuntimeException("Vòng thi không thuộc hạng mục của đội");
+        }
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
+            throw new RuntimeException("Hạn nộp bài cho vòng thi này đã kết thúc (Hạn chót: " + matrix.getSubmissionDeadline() + ")");
+        }
+
         submission.setMatrix(matrix);
         submission.setFileUrl(request.getFileUrl());
         submission.setIsGraded(false);
@@ -98,26 +117,6 @@ public class SubmissionService {
                 .filter(submission -> isAssignedToMatrix(user, submission.getMatrix()))
                 .map(this::toSubmissionResponse)
                 .toList();
-    }
-
-    @Transactional
-    public SubmissionResponse gradeSubmission(Long id, GradeRequest request) {
-        Submission submission = submissionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy bài nộp"));
-
-        User user = getCurrentUser();
-        boolean manager = user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR;
-        boolean judge = submission.getMatrix() != null && submission.getMatrix().getJudges() != null
-                && submission.getMatrix().getJudges().stream().anyMatch(item -> item.getId().equals(user.getId()));
-        if (!manager && !judge) {
-            throw new RuntimeException("Bạn chưa được phân công làm giám khảo cho vòng đấu này");
-        }
-
-        submission.setScore(request.getScore());
-        submission.setFeedback(request.getFeedback());
-        submission.setIsGraded(true);
-
-        return toSubmissionResponse(submissionRepository.save(submission));
     }
 
     private Team getCurrentUserTeam() {

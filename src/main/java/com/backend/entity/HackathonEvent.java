@@ -43,4 +43,5 @@ public class HackathonEvent extends BaseEntity {
     private String ruleDocumentUrl;
 
     private boolean isActive = true;
+    private Boolean resultsPublished = false;
 }
