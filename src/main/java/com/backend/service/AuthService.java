@@ -65,11 +65,7 @@ public class AuthService {
         try {
             mailSender.send(message);
         } catch (Exception e) {
-            String errorDetail = e.getMessage();
-            if (e.getCause() != null) {
-                errorDetail += " (Cause: " + e.getCause().getMessage() + ")";
-            }
-            throw new RuntimeException("Không thể gửi email mã OTP. Lỗi SMTP: " + errorDetail);
+            throw new AppException(ErrorCode.EMAIL_SEND_FAILED);
         }
 
         return "Đã gửi mã OTP đến email của bạn. Vui lòng kiểm tra hộp thư.";
@@ -107,10 +103,10 @@ public class AuthService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         if (user.getStatus() != AccountStatus.APPROVED) {
-            throw new RuntimeException("Tài khoản chưa được duyệt hoặc đã bị khóa");
+            throw new AppException(ErrorCode.ACCOUNT_NOT_APPROVED);
         }
         if (systemConfigurationService.maintenanceMode() && user.getRole() != RoleType.ADMIN) {
-            throw new RuntimeException("Hệ thống đang bảo trì. Vui lòng quay lại sau.");
+            throw new AppException(ErrorCode.MAINTENANCE_MODE);
         }
 
         boolean isMatch = passwordEncoder.matches(request.getPassword(), user.getPassword());
@@ -132,21 +128,21 @@ public class AuthService {
 
     private void verifyRegistrationOtp(String email, String otp) {
         if (otp == null || otp.isBlank()) {
-            throw new RuntimeException("Vui lòng nhập mã OTP đã gửi qua email.");
+            throw new AppException(ErrorCode.OTP_REQUIRED);
         }
 
         OtpRecord record = registrationOtps.get(email);
         if (record == null) {
-            throw new RuntimeException("Bạn chưa yêu cầu mã OTP hoặc mã đã hết hạn.");
+            throw new AppException(ErrorCode.OTP_NOT_REQUESTED);
         }
 
         if (LocalDateTime.now().isAfter(record.expiresAt())) {
             registrationOtps.remove(email);
-            throw new RuntimeException("Mã OTP đã hết hạn. Vui lòng gửi lại mã mới.");
+            throw new AppException(ErrorCode.OTP_EXPIRED);
         }
 
         if (!record.code().equals(otp.trim())) {
-            throw new RuntimeException("Mã OTP không đúng.");
+            throw new AppException(ErrorCode.OTP_INVALID);
         }
     }
 
@@ -156,7 +152,7 @@ public class AuthService {
 
     private void ensureRegistrationEnabled() {
         if (!systemConfigurationService.registrationEnabled()) {
-            throw new RuntimeException("Hệ thống đang tạm đóng đăng ký tài khoản mới");
+            throw new AppException(ErrorCode.REGISTRATION_DISABLED);
         }
     }
 
