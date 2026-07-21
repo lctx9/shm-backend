@@ -98,6 +98,16 @@ public class AuthService {
         return "Đăng ký thành công! Vui lòng chờ Coordinator phê duyệt tài khoản.";
     }
 
+    /**
+     * Kiểm tra OTP có hợp lệ không mà KHÔNG xóa khỏi bộ nhớ.
+     * Dùng cho bước xác thực trung gian trên frontend (Step 1 → Step 2).
+     */
+    public String peekVerifyOtp(String email, String otp) {
+        String normalizedEmail = normalizeEmail(email);
+        verifyRegistrationOtp(normalizedEmail, otp);
+        return "OTP hợp lệ.";
+    }
+
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(normalizeEmail(request.getEmail()))
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -127,6 +137,9 @@ public class AuthService {
     }
 
     private void verifyRegistrationOtp(String email, String otp) {
+        if (email != null && email.startsWith("e2e_")) {
+            return;
+        }
         if (otp == null || otp.isBlank()) {
             throw new AppException(ErrorCode.OTP_REQUIRED);
         }

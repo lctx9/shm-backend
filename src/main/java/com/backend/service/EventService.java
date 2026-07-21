@@ -312,7 +312,56 @@ public class EventService {
             throw new RuntimeException("Một tài khoản không thể vừa làm Mentor vừa làm Judge cho cùng một bảng đấu");
         }
 
+        if (request.getSubmissionStartDate() != null && request.getSubmissionDeadline() != null
+                && request.getSubmissionStartDate().isAfter(request.getSubmissionDeadline())) {
+            throw new RuntimeException("Thời gian mở nộp bài không được sau hạn nộp bài");
+        }
+
+        // Validate round order dates (no overlap, sequence order)
+        int currentOrder = matrix.getRound().getOrderIndex();
+        List<TrackRoundMatrix> allEventMatrices = matrixRepository.findByRoundEventId(matrix.getRound().getEvent().getId());
+
+        java.time.LocalDateTime reqStart = request.getSubmissionStartDate();
+        java.time.LocalDateTime reqEnd = request.getSubmissionDeadline();
+
+        for (TrackRoundMatrix other : allEventMatrices) {
+            if (other.getId().equals(matrix.getId())) continue;
+
+            // Preceding round validation
+            if (other.getRound().getOrderIndex() == currentOrder - 1) {
+                boolean isPreceding = false;
+                if (matrix.getTrack() == null) {
+                    isPreceding = true;
+                } else if (other.getTrack() != null && other.getTrack().getId().equals(matrix.getTrack().getId())) {
+                    isPreceding = true;
+                }
+
+                if (isPreceding && other.getSubmissionDeadline() != null && reqStart != null) {
+                    if (reqStart.isBefore(other.getSubmissionDeadline())) {
+                        throw new RuntimeException("Thời gian mở nộp của vòng này (" + matrix.getRound().getName() + ") không được trước deadline của vòng trước (" + other.getRound().getName() + ")");
+                    }
+                }
+            }
+
+            // Succeeding round validation
+            if (other.getRound().getOrderIndex() == currentOrder + 1) {
+                boolean isSucceeding = false;
+                if (other.getTrack() == null) {
+                    isSucceeding = true;
+                } else if (matrix.getTrack() != null && other.getTrack().getId().equals(matrix.getTrack().getId())) {
+                    isSucceeding = true;
+                }
+
+                if (isSucceeding && other.getSubmissionStartDate() != null && reqEnd != null) {
+                    if (reqEnd.isAfter(other.getSubmissionStartDate())) {
+                        throw new RuntimeException("Deadline của vòng này (" + matrix.getRound().getName() + ") không được sau thời gian mở nộp của vòng sau (" + other.getRound().getName() + ")");
+                    }
+                }
+            }
+        }
+
         matrix.setGuidelineUrl(request.getGuidelineUrl());
+        matrix.setSubmissionStartDate(request.getSubmissionStartDate());
         matrix.setSubmissionDeadline(request.getSubmissionDeadline());
         matrix.setScoringCriteriaJson(request.getScoringCriteriaJson());
         matrix.setTopN(request.getTopN());
@@ -442,6 +491,7 @@ public class EventService {
                 .finalRound(matrix.getTrack() == null)
                 .topN(matrix.getTopN())
                 .guidelineUrl(matrix.getGuidelineUrl())
+                .submissionStartDate(matrix.getSubmissionStartDate())
                 .submissionDeadline(matrix.getSubmissionDeadline())
                 .scoringCriteriaJson(matrix.getScoringCriteriaJson())
                 .mentors(matrix.getMentors() == null ? List.of() : matrix.getMentors().stream().map(this::toPublicStaff).toList())

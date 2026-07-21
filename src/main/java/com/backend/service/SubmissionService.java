@@ -52,6 +52,33 @@ public class SubmissionService {
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        com.backend.entity.HackathonEvent event = team.getEvent();
+        if (event != null && event.getEventStartDate() != null && now.isBefore(event.getEventStartDate())) {
+            throw new AppException(ErrorCode.EVENT_NOT_STARTED);
+        }
+
+        int currentOrder = matrix.getRound().getOrderIndex();
+        if (currentOrder > 1) {
+            List<TrackRoundMatrix> allEventMatrices = matrixRepository.findByRoundEventId(matrix.getRound().getEvent().getId());
+            for (TrackRoundMatrix other : allEventMatrices) {
+                if (other.getRound().getOrderIndex() == currentOrder - 1) {
+                    boolean isPreceding = false;
+                    if (matrix.getTrack() == null) {
+                        isPreceding = true;
+                    } else if (other.getTrack() != null && other.getTrack().getId().equals(matrix.getTrack().getId())) {
+                        isPreceding = true;
+                    }
+
+                    if (isPreceding && other.getSubmissionDeadline() != null && now.isBefore(other.getSubmissionDeadline())) {
+                        throw new AppException(ErrorCode.PREVIOUS_ROUND_NOT_ENDED);
+                    }
+                }
+            }
+        }
+
+        if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
+            throw new AppException(ErrorCode.SUBMISSION_NOT_STARTED);
+        }
         if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
             throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }
@@ -67,10 +94,21 @@ public class SubmissionService {
         return toSubmissionResponse(submissionRepository.save(submission));
     }
 
-    public List<SubmissionResponse> getMySubmissions() {
+    public List<SubmissionResponse> getMySubmissions(Long teamId, Long eventId) {
         User currentUser = getCurrentUser();
         List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
         List<SubmissionResponse> result = new java.util.ArrayList<>();
+        
+        if (teamId != null) {
+            memberships = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getId().equals(teamId))
+                    .toList();
+        } else if (eventId != null) {
+            memberships = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null && m.getTeam().getEvent().getId().equals(eventId))
+                    .toList();
+        }
+
         for (TeamMember m : memberships) {
             submissionRepository.findByTeamId(m.getTeam().getId()).stream()
                     .max(java.util.Comparator.comparing(Submission::getCreatedAt))
@@ -96,6 +134,33 @@ public class SubmissionService {
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        com.backend.entity.HackathonEvent event = submission.getTeam().getEvent();
+        if (event != null && event.getEventStartDate() != null && now.isBefore(event.getEventStartDate())) {
+            throw new AppException(ErrorCode.EVENT_NOT_STARTED);
+        }
+
+        int currentOrder = matrix.getRound().getOrderIndex();
+        if (currentOrder > 1) {
+            List<TrackRoundMatrix> allEventMatrices = matrixRepository.findByRoundEventId(matrix.getRound().getEvent().getId());
+            for (TrackRoundMatrix other : allEventMatrices) {
+                if (other.getRound().getOrderIndex() == currentOrder - 1) {
+                    boolean isPreceding = false;
+                    if (matrix.getTrack() == null) {
+                        isPreceding = true;
+                    } else if (other.getTrack() != null && other.getTrack().getId().equals(matrix.getTrack().getId())) {
+                        isPreceding = true;
+                    }
+
+                    if (isPreceding && other.getSubmissionDeadline() != null && now.isBefore(other.getSubmissionDeadline())) {
+                        throw new AppException(ErrorCode.PREVIOUS_ROUND_NOT_ENDED);
+                    }
+                }
+            }
+        }
+
+        if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
+            throw new AppException(ErrorCode.SUBMISSION_NOT_STARTED);
+        }
         if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
             throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }
@@ -137,11 +202,9 @@ public class SubmissionService {
     }
 
     private void requireTeamLeader(Long teamId) {
-        TeamMember membership = teamMemberRepository.findAllByUser(getCurrentUser()).stream()
-                .filter(m -> m.getTeam().getId().equals(teamId))
-                .findFirst()
+        TeamMember membership = teamMemberRepository.findByUserIdAndTeamId(getCurrentUser().getId(), teamId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
-        if (!membership.getTeam().getId().equals(teamId) || membership.getRole() != MemberRole.LEADER) {
+        if (membership.getRole() != MemberRole.LEADER) {
             throw new AppException(ErrorCode.NOT_TEAM_LEADER);
         }
     }

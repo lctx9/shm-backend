@@ -30,9 +30,11 @@ public class SubmissionController {
     // THÊM MỚI: Kiểm tra xem đã nộp bài chưa
     @GetMapping("/my-submission")
     @PreAuthorize("hasRole('USER')")
-    public ApiResponse<List<SubmissionResponse>> getMySubmission() {
+    public ApiResponse<List<SubmissionResponse>> getMySubmission(
+            @RequestParam(required = false) Long teamId,
+            @RequestParam(required = false) Long eventId) {
         return ApiResponse.<List<SubmissionResponse>>builder()
-                .result(submissionService.getMySubmissions())
+                .result(submissionService.getMySubmissions(teamId, eventId))
                 .build();
     }
 
