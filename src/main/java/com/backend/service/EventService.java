@@ -26,6 +26,7 @@ import com.backend.repository.TeamRepository;
 import com.backend.repository.TrackRepository;
 import com.backend.repository.TrackRoundMatrixRepository;
 import com.backend.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,7 @@ public class EventService {
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final PrizeRepository prizeRepository;
+    private final ObjectMapper objectMapper;
 
     private void validateEventRequest(EventRequest request) {
         if (request.getRoundCount() == null) {
@@ -271,6 +273,43 @@ public class EventService {
         }
         if (matrix.getTrack() != null && (request.getTopN() == null || request.getTopN() < 1)) {
             throw new RuntimeException("Top N của vòng loại phải lớn hơn 0");
+        }
+
+        // Validate scoring criteria weights
+        if (request.getScoringCriteriaJson() != null) {
+            validateScoringCriteria(request.getScoringCriteriaJson());
+        }
+
+        // Validate mentor and judge intersection
+        java.util.Set<Long> finalMentorIds;
+        if (request.getMentorIds() != null) {
+            finalMentorIds = request.getMentorIds();
+        } else {
+            finalMentorIds = matrix.getMentors() != null
+                    ? matrix.getMentors().stream().map(User::getId).collect(java.util.stream.Collectors.toSet())
+                    : new java.util.HashSet<>();
+        }
+
+        java.util.Set<Long> finalJudgeIds;
+        if (request.getJudgeIds() != null) {
+            finalJudgeIds = request.getJudgeIds();
+        } else {
+            finalJudgeIds = matrix.getJudges() != null
+                    ? matrix.getJudges().stream().map(User::getId).collect(java.util.stream.Collectors.toSet())
+                    : new java.util.HashSet<>();
+        }
+
+        java.util.Set<Long> allTrackMentorIds = new java.util.HashSet<>(finalMentorIds);
+        if (matrix.getTrack() != null && matrix.getTrack().getMentors() != null) {
+            matrix.getTrack().getMentors().stream()
+                    .map(User::getId)
+                    .forEach(allTrackMentorIds::add);
+        }
+
+        java.util.Set<Long> finalIntersection = new java.util.HashSet<>(allTrackMentorIds);
+        finalIntersection.retainAll(finalJudgeIds);
+        if (!finalIntersection.isEmpty()) {
+            throw new RuntimeException("Một tài khoản không thể vừa làm Mentor vừa làm Judge cho cùng một bảng đấu");
         }
 
         matrix.setGuidelineUrl(request.getGuidelineUrl());
@@ -508,5 +547,40 @@ public class EventService {
                     }
                 })
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void validateScoringCriteria(String jsonStr) {
+        if (jsonStr == null || jsonStr.trim().isEmpty()) {
+            return;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(jsonStr);
+            if (!root.isArray()) {
+                throw new RuntimeException("Tiêu chí chấm điểm phải là một danh sách (array)");
+            }
+            double totalWeight = 0;
+            for (com.fasterxml.jackson.databind.JsonNode node : root) {
+                String label = node.path("label").asText();
+                if (label == null || label.trim().isEmpty()) {
+                    throw new RuntimeException("Tên tiêu chí chấm điểm không được để trống");
+                }
+                double maxScore = node.path("maxScore").asDouble(0);
+                if (maxScore <= 0) {
+                    throw new RuntimeException("Điểm tối đa của tiêu chí phải lớn hơn 0");
+                }
+                double weight = node.path("weight").asDouble(0);
+                if (weight <= 0) {
+                    throw new RuntimeException("Trọng số của tiêu chí phải lớn hơn 0");
+                }
+                totalWeight += weight;
+            }
+            if (Math.abs(totalWeight - 100.0) > 0.001) {
+                throw new RuntimeException("Tổng trọng số của các tiêu chí phải bằng chính xác 100%");
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Định dạng tiêu chí chấm điểm không hợp lệ");
+        }
     }
 }
