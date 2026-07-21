@@ -53,11 +53,30 @@ public class TeamService {
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
 
+    private void validateEventOverlap(User user, HackathonEvent newEvent) {
+        List<TeamMember> currentMemberships = teamMemberRepository.findAllByUser(user);
+        for (TeamMember member : currentMemberships) {
+            HackathonEvent existingEvent = member.getTeam().getEvent();
+            if (existingEvent.getId().equals(newEvent.getId())) {
+                throw new RuntimeException("Thành viên " + user.getEmail() + " đã tham gia một đội trong cùng sự kiện này!");
+            }
+            if (existingEvent.getEventStartDate() != null && existingEvent.getEventEndDate() != null &&
+                newEvent.getEventStartDate() != null && newEvent.getEventEndDate() != null) {
+                if (existingEvent.getEventStartDate().isBefore(newEvent.getEventEndDate()) &&
+                    existingEvent.getEventEndDate().isAfter(newEvent.getEventStartDate())) {
+                    throw new RuntimeException("Thành viên " + user.getEmail() + " đang tham gia sự kiện '" + existingEvent.getName() + "' có thời gian thi đấu trùng lặp với sự kiện này!");
+                }
+            }
+        }
+    }
+
     @Transactional
     public TeamResponse createTeam(TeamCreateRequest request) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+
 
         if (teamRepository.existsByName(request.getName())) {
             throw new AppException(ErrorCode.TEAM_EXISTED);
@@ -77,9 +96,7 @@ public class TeamService {
             throw new RuntimeException("Bảng đấu " + track.getName() + " đã đạt giới hạn tối đa " + track.getMaxTeams() + " đội tham gia.");
         }
 
-        if (teamMemberRepository.existsByUserIdAndTeamEventId(currentUser.getId(), event.getId())) {
-            throw new AppException(ErrorCode.ALREADY_IN_TEAM);
-        }
+        validateEventOverlap(currentUser, event);
 
         // Validate memberEmails (must invite at least 2 other members, unique, exists, not already in team)
         List<String> emails = request.getMemberEmails();
@@ -115,9 +132,7 @@ public class TeamService {
                 user.getRole() == com.backend.entity.enums.RoleType.JUDGE) {
                 throw new RuntimeException("Không thể mời tài khoản Ban tổ chức/Staff vào đội thi.");
             }
-            if (teamMemberRepository.existsByUserIdAndTeamEventId(user.getId(), event.getId())) {
-                throw new RuntimeException("Thành viên có email " + email + " đã ở trong một đội khác, không thể mời thành viên này và đội không thể thành lập!");
-            }
+            validateEventOverlap(user, event);
             invitedUsers.add(user);
         }
 
@@ -176,34 +191,21 @@ public class TeamService {
         return teamRepository.findAll().stream().map(t -> toTeamResponse(t, true)).toList();
     }
 
-    public TeamResponse getMyTeam(Long eventId) {
+    public List<TeamResponse> getMyTeams(Long eventId) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
-        if (memberships.isEmpty()) {
-            return null;
-        }
-
-        TeamMember targetMembership = null;
+        List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
         if (eventId != null) {
-            targetMembership = memberships.stream()
+            memberships = memberships.stream()
                     .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null && m.getTeam().getEvent().getId().equals(eventId))
-                    .findFirst()
-                    .orElse(null);
-        } else {
-            targetMembership = memberships.stream()
-                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null)
-                    .max(java.util.Comparator.comparing(m -> m.getTeam().getEvent().getId()))
-                    .orElse(memberships.get(0));
+                    .toList();
         }
 
-        if (targetMembership == null) {
-            return null;
-        }
-
-        return toTeamResponse(targetMembership.getTeam());
+        return memberships.stream()
+                .map(m -> toTeamResponse(m.getTeam()))
+                .toList();
     }
 
     @Transactional
@@ -726,7 +728,7 @@ public class TeamService {
             myMembership = teamMemberRepository.findByUserIdAndTeamId(currentUser.getId(), teamId)
                     .orElseThrow(() -> new RuntimeException("Bạn không ở trong đội này để rời."));
         } else {
-            List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
+            List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
             if (memberships.isEmpty()) {
                 throw new RuntimeException("Bạn không ở trong đội nào để rời.");
             }
@@ -859,7 +861,7 @@ public class TeamService {
             return teamMemberRepository.findByUserIdAndTeamId(currentUser.getId(), teamId)
                     .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
         } else {
-            List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
+            List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
             if (memberships.isEmpty()) {
                 throw new AppException(ErrorCode.TEAM_NOT_FOUND);
             }

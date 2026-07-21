@@ -94,21 +94,28 @@ public class SubmissionService {
         return toSubmissionResponse(submissionRepository.save(submission));
     }
 
-    public SubmissionResponse getMySubmission(Long teamId, Long eventId) {
-        Team team = null;
+    public List<SubmissionResponse> getMySubmissions(Long teamId, Long eventId) {
+        User currentUser = getCurrentUser();
+        List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
+        List<SubmissionResponse> result = new java.util.ArrayList<>();
+        
         if (teamId != null) {
-            team = teamRepository.findById(teamId).orElse(null);
-        } else {
-            team = getCurrentUserTeam(eventId);
-        }
-        if (team == null) {
-            return null;
+            memberships = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getId().equals(teamId))
+                    .toList();
+        } else if (eventId != null) {
+            memberships = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null && m.getTeam().getEvent().getId().equals(eventId))
+                    .toList();
         }
 
-        return submissionRepository.findByTeamId(team.getId()).stream()
-                .max(Comparator.comparing(Submission::getCreatedAt))
-                .map(this::toSubmissionResponse)
-                .orElse(null);
+        for (TeamMember m : memberships) {
+            submissionRepository.findByTeamId(m.getTeam().getId()).stream()
+                    .max(java.util.Comparator.comparing(Submission::getCreatedAt))
+                    .map(this::toSubmissionResponse)
+                    .ifPresent(result::add);
+        }
+        return result;
     }
 
     public SubmissionResponse updateSubmission(Long id, SubmissionRequest request) {
@@ -180,28 +187,6 @@ public class SubmissionService {
                 .toList();
     }
 
-    private Team getCurrentUserTeam(Long eventId) {
-        User currentUser = getCurrentUser();
-        List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
-        if (memberships.isEmpty()) {
-            return null;
-        }
-
-        TeamMember target = null;
-        if (eventId != null) {
-            target = memberships.stream()
-                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null && m.getTeam().getEvent().getId().equals(eventId))
-                    .findFirst()
-                    .orElse(null);
-        } else {
-            target = memberships.stream()
-                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null)
-                    .max(Comparator.comparing(m -> m.getTeam().getEvent().getId()))
-                    .orElse(memberships.get(0));
-        }
-
-        return target == null ? null : target.getTeam();
-    }
 
     private User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();

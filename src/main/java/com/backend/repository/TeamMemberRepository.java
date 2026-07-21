@@ -10,8 +10,8 @@ import java.util.List;
 
 @Repository
 public interface TeamMemberRepository extends JpaRepository<TeamMember, Long> {
-    // Tìm thông tin thành viên dựa vào User
-    java.util.List<TeamMember> findByUser(User user);
+    List<TeamMember> findAllByUser(User user);
+    List<TeamMember> findByUser(User user);
     List<TeamMember> findByTeamId(Long teamId);
     long countByTeamId(Long teamId);
 

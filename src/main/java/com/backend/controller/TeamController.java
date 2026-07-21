@@ -37,9 +37,9 @@ public class TeamController {
 
     @GetMapping("/my-team")
     @PreAuthorize("hasRole('USER')")
-    public ApiResponse<TeamResponse> getMyTeam(@RequestParam(required = false) Long eventId) {
-        return ApiResponse.<TeamResponse>builder()
-                .result(teamService.getMyTeam(eventId))
+    public ApiResponse<List<TeamResponse>> getMyTeam(@RequestParam(required = false) Long eventId) {
+        return ApiResponse.<List<TeamResponse>>builder()
+                .result(teamService.getMyTeams(eventId))
                 .build();
     }
 
