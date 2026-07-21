@@ -57,6 +57,7 @@ public enum ErrorCode {
     // ==========================================
     SUBMISSION_NOT_FOUND(1030, "Không tìm thấy bài nộp", HttpStatus.NOT_FOUND),
     SUBMISSION_DEADLINE_PASSED(1031, "Thời hạn nộp bài đã kết thúc", HttpStatus.BAD_REQUEST),
+    SUBMISSION_NOT_STARTED(1043, "Thời gian mở nộp bài chưa bắt đầu", HttpStatus.BAD_REQUEST),
     SUBMISSION_ALREADY_EXISTS(1032, "Đội thi đã nộp bài cho vòng thi này rồi", HttpStatus.CONFLICT),
     JUDGE_NOT_ASSIGNED(1033, "Bạn chưa được phân công làm giám khảo cho vòng đấu này", HttpStatus.FORBIDDEN),
     EDIT_REASON_REQUIRED(1034, "Phải cung cấp lý do khi sửa điểm", HttpStatus.BAD_REQUEST),
