@@ -52,6 +52,30 @@ public class SubmissionService {
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        com.backend.entity.HackathonEvent event = team.getEvent();
+        if (event != null && event.getEventStartDate() != null && now.isBefore(event.getEventStartDate())) {
+            throw new AppException(ErrorCode.EVENT_NOT_STARTED);
+        }
+
+        int currentOrder = matrix.getRound().getOrderIndex();
+        if (currentOrder > 1) {
+            List<TrackRoundMatrix> allEventMatrices = matrixRepository.findByRoundEventId(matrix.getRound().getEvent().getId());
+            for (TrackRoundMatrix other : allEventMatrices) {
+                if (other.getRound().getOrderIndex() == currentOrder - 1) {
+                    boolean isPreceding = false;
+                    if (matrix.getTrack() == null) {
+                        isPreceding = true;
+                    } else if (other.getTrack() != null && other.getTrack().getId().equals(matrix.getTrack().getId())) {
+                        isPreceding = true;
+                    }
+
+                    if (isPreceding && other.getSubmissionDeadline() != null && now.isBefore(other.getSubmissionDeadline())) {
+                        throw new AppException(ErrorCode.PREVIOUS_ROUND_NOT_ENDED);
+                    }
+                }
+            }
+        }
+
         if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
             throw new AppException(ErrorCode.SUBMISSION_NOT_STARTED);
         }
@@ -103,6 +127,30 @@ public class SubmissionService {
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        com.backend.entity.HackathonEvent event = submission.getTeam().getEvent();
+        if (event != null && event.getEventStartDate() != null && now.isBefore(event.getEventStartDate())) {
+            throw new AppException(ErrorCode.EVENT_NOT_STARTED);
+        }
+
+        int currentOrder = matrix.getRound().getOrderIndex();
+        if (currentOrder > 1) {
+            List<TrackRoundMatrix> allEventMatrices = matrixRepository.findByRoundEventId(matrix.getRound().getEvent().getId());
+            for (TrackRoundMatrix other : allEventMatrices) {
+                if (other.getRound().getOrderIndex() == currentOrder - 1) {
+                    boolean isPreceding = false;
+                    if (matrix.getTrack() == null) {
+                        isPreceding = true;
+                    } else if (other.getTrack() != null && other.getTrack().getId().equals(matrix.getTrack().getId())) {
+                        isPreceding = true;
+                    }
+
+                    if (isPreceding && other.getSubmissionDeadline() != null && now.isBefore(other.getSubmissionDeadline())) {
+                        throw new AppException(ErrorCode.PREVIOUS_ROUND_NOT_ENDED);
+                    }
+                }
+            }
+        }
+
         if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
             throw new AppException(ErrorCode.SUBMISSION_NOT_STARTED);
         }

@@ -784,6 +784,7 @@ public class TeamService {
                 .type(team.getType())
                 .eventId(team.getEvent() == null ? null : team.getEvent().getId())
                 .eventName(team.getEvent() == null ? null : team.getEvent().getName())
+                .eventStartDate(team.getEvent() == null ? null : team.getEvent().getEventStartDate())
                 .trackId(team.getTrack() == null ? null : team.getTrack().getId())
                 .trackName(team.getTrack() == null ? null : team.getTrack().getName())
                 .members(members)
