@@ -163,5 +163,34 @@ public class TeamController {
                 .result(teamService.getPendingInvitationsSent(teamId))
                 .build();
     }
+
+    @PostMapping("/{teamId}/propose-disqualify")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR') or hasRole('STAFF')")
+    public ApiResponse<String> proposeDisqualifyTeam(@PathVariable Long teamId, @RequestBody java.util.Map<String, String> body) {
+        String reason = body.get("reason");
+        teamService.proposeDisqualifyTeam(teamId, reason);
+        return ApiResponse.<String>builder()
+                .result("Đã gửi đề xuất loại đội thi thành công. Đang chờ Coordinator duyệt.")
+                .build();
+    }
+
+    @PostMapping("/{teamId}/approve-disqualify")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR')")
+    public ApiResponse<String> approveDisqualifyTeam(@PathVariable Long teamId) {
+        teamService.approveDisqualifyTeam(teamId);
+        return ApiResponse.<String>builder()
+                .result("Đã duyệt loại đội thi thành công.")
+                .build();
+    }
+
+    @PostMapping("/{teamId}/reject-disqualify")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR')")
+    public ApiResponse<String> rejectDisqualifyTeam(@PathVariable Long teamId, @RequestBody java.util.Map<String, String> body) {
+        String reason = body.get("reason");
+        teamService.rejectDisqualifyTeam(teamId, reason);
+        return ApiResponse.<String>builder()
+                .result("Đã từ chối loại đội thi thành công.")
+                .build();
+    }
 }
 

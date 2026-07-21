@@ -31,4 +31,12 @@ public class Team extends BaseEntity {
     @ManyToOne
     @JoinColumn(name = "event_id")
     private HackathonEvent event;
+
+    private String disqualificationStatus;
+
+    private String disqualificationReason;
+
+    private String disqualifierEmail;
+
+    private String rejectionReason;
 }

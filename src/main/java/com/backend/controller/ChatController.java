@@ -64,9 +64,11 @@ public class ChatController {
 
         boolean teamMember = teamMemberRepository.findByTeamId(team.getId()).stream()
                 .anyMatch(member -> member.getUser() != null && member.getUser().getId().equals(user.getId()));
-        boolean assignedMentor = team.getTrack() != null && matrixRepository.findByTrackId(team.getTrack().getId()).stream()
+        boolean trackMentor = team.getTrack() != null && team.getTrack().getMentors() != null
+                && team.getTrack().getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId()));
+        boolean assignedMentor = trackMentor || (team.getTrack() != null && matrixRepository.findByTrackId(team.getTrack().getId()).stream()
                 .anyMatch(matrix -> matrix.getMentors() != null
-                        && matrix.getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId())));
+                        && matrix.getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId()))));
         if (!teamMember && !assignedMentor) {
             throw new RuntimeException("Bạn không phải thành viên hoặc mentor được phân công của đội này");
         }

@@ -23,4 +23,10 @@ public class SubmissionResponse {
     private String feedback;
     private String criteriaScoresJson;
     private Boolean graded;
+    // Disqualification workflow fields
+    private String disqualificationStatus;
+    private String disqualificationReason;
+    private String disqualifierEmail;
+    private String rejectionReason;
 }
+

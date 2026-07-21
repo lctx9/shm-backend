@@ -17,6 +17,8 @@ import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TeamRepository;
 import com.backend.repository.TrackRoundMatrixRepository;
 import com.backend.repository.UserRepository;
+import com.backend.repository.ScoreRepository;
+import com.backend.entity.Score;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,6 +36,7 @@ public class SubmissionService {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final TrackRoundMatrixRepository matrixRepository;
+    private final ScoreRepository scoreRepository;
 
     public SubmissionResponse submitWork(SubmissionRequest request) {
         Team team = teamRepository.findById(request.getTeamId())
@@ -111,9 +114,8 @@ public class SubmissionService {
 
         for (TeamMember m : memberships) {
             submissionRepository.findByTeamId(m.getTeam().getId()).stream()
-                    .max(java.util.Comparator.comparing(Submission::getCreatedAt))
                     .map(this::toSubmissionResponse)
-                    .ifPresent(result::add);
+                    .forEach(result::add);
         }
         return result;
     }
@@ -213,6 +215,51 @@ public class SubmissionService {
         TrackRoundMatrix matrix = submission.getMatrix();
         Team team = submission.getTeam();
 
+        // Default values (global view)
+        Double scoreVal = submission.getScore();
+        String criteriaScores = submission.getCriteriaScoresJson();
+        String feedbackVal = submission.getFeedback();
+        Boolean isGradedVal = submission.getIsGraded();
+
+        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            String email = auth.getName();
+            java.util.Optional<User> currentUserOpt = userRepository.findByEmail(email);
+            if (currentUserOpt.isPresent()) {
+                User currentUser = currentUserOpt.get();
+                
+                // 1. If current user is a participant (USER role), apply results publication check
+                if (currentUser.getRole() == RoleType.USER) {
+                    boolean resultsPublished = matrix != null 
+                            && matrix.getRound() != null 
+                            && matrix.getRound().getEvent() != null 
+                            && Boolean.TRUE.equals(matrix.getRound().getEvent().getResultsPublished());
+                    
+                    if (!resultsPublished) {
+                        scoreVal = null;
+                        criteriaScores = null;
+                        feedbackVal = null;
+                        isGradedVal = false;
+                    }
+                } 
+                // 2. If current user is a staff/judge, return their personal grading status/score
+                else if (currentUser.getRole() == RoleType.STAFF || currentUser.getRole() == RoleType.MENTOR || currentUser.getRole() == RoleType.JUDGE) {
+                    Score personalScore = scoreRepository.findBySubmissionIdAndJudgeId(submission.getId(), currentUser.getId()).orElse(null);
+                    if (personalScore != null) {
+                        isGradedVal = true;
+                        scoreVal = personalScore.getScoreValue();
+                        criteriaScores = personalScore.getCriteriaScoresJson();
+                        feedbackVal = personalScore.getComment();
+                    } else {
+                        isGradedVal = false;
+                        scoreVal = null;
+                        criteriaScores = null;
+                        feedbackVal = null;
+                    }
+                }
+            }
+        }
+
         return SubmissionResponse.builder()
                 .id(submission.getId())
                 .teamId(team == null ? null : team.getId())
@@ -223,10 +270,15 @@ public class SubmissionService {
                 .fileUrl(submission.getFileUrl())
                 .flagged(submission.isFlagged())
                 .flagReason(submission.getFlagReason())
-                .score(submission.getScore())
-                .feedback(submission.getFeedback())
-                .criteriaScoresJson(submission.getCriteriaScoresJson())
-                .graded(submission.getIsGraded())
+                .score(scoreVal)
+                .feedback(feedbackVal)
+                .criteriaScoresJson(criteriaScores)
+                .graded(isGradedVal)
+                // Disqualification workflow — always expose so all judges see the same status
+                .disqualificationStatus(team == null ? null : team.getDisqualificationStatus())
+                .disqualificationReason(team == null ? null : team.getDisqualificationReason())
+                .disqualifierEmail(team == null ? null : team.getDisqualifierEmail())
+                .rejectionReason(team == null ? null : team.getRejectionReason())
                 .build();
     }
 }

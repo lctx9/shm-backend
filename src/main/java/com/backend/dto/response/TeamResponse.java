@@ -25,5 +25,9 @@ public class TeamResponse {
     private List<TeamMemberResponse> members;
     private int memberCount;
     private String joinPassword;
+    private String disqualificationStatus;
+    private String disqualificationReason;
+    private String disqualifierEmail;
+    private String rejectionReason;
 }
 
