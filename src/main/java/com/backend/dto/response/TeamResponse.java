@@ -19,6 +19,7 @@ public class TeamResponse {
     private TeamType type;
     private Long eventId;
     private String eventName;
+    private java.time.LocalDateTime eventStartDate;
     private Long trackId;
     private String trackName;
     private List<TeamMemberResponse> members;
