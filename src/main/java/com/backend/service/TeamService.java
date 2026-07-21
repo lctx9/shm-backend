@@ -108,6 +108,13 @@ public class TeamService {
             if (user == null || user.getStatus() != com.backend.entity.enums.AccountStatus.APPROVED) {
                 throw new RuntimeException("Không tìm thấy thành viên với email: " + email);
             }
+            if (user.getRole() == com.backend.entity.enums.RoleType.ADMIN ||
+                user.getRole() == com.backend.entity.enums.RoleType.COORDINATOR ||
+                user.getRole() == com.backend.entity.enums.RoleType.STAFF ||
+                user.getRole() == com.backend.entity.enums.RoleType.MENTOR ||
+                user.getRole() == com.backend.entity.enums.RoleType.JUDGE) {
+                throw new RuntimeException("Không thể mời tài khoản Ban tổ chức/Staff vào đội thi.");
+            }
             if (teamMemberRepository.existsByUserIdAndTeamEventId(user.getId(), event.getId())) {
                 throw new RuntimeException("Thành viên có email " + email + " đã ở trong một đội khác, không thể mời thành viên này và đội không thể thành lập!");
             }
@@ -239,6 +246,14 @@ public class TeamService {
 
         User invitedUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy email thành viên"));
+
+        if (invitedUser.getRole() == com.backend.entity.enums.RoleType.ADMIN ||
+            invitedUser.getRole() == com.backend.entity.enums.RoleType.COORDINATOR ||
+            invitedUser.getRole() == com.backend.entity.enums.RoleType.STAFF ||
+            invitedUser.getRole() == com.backend.entity.enums.RoleType.MENTOR ||
+            invitedUser.getRole() == com.backend.entity.enums.RoleType.JUDGE) {
+            throw new RuntimeException("Không thể mời tài khoản Ban tổ chức/Staff vào đội thi.");
+        }
 
         HackathonEvent event = leader.getTeam().getEvent();
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
