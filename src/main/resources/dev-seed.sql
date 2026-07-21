@@ -106,30 +106,30 @@ INSERT INTO rounds (id, created_at, updated_at, name, order_index, event_id) VAL
 
 INSERT INTO track_round_matrix (
     id, created_at, updated_at, track_id, round_id, guideline_url,
-    submission_deadline, scoring_criteria_json
+    submission_start_date, submission_deadline, scoring_criteria_json
 ) VALUES
-    (1, now(), now(), 1, 1, 'https://example.com/guidelines/se-r1.pdf', '2026-07-24 23:59:00',
+    (1, now(), now(), 1, 1, 'https://example.com/guidelines/se-r1.pdf', now() - interval '1 day', '2026-07-24 23:59:00',
     $$[
       {"id":"problem_fit","label":"Problem fit","description":"Muc do hieu bai toan va dung nhu cau nguoi dung","maxScore":100,"weight":25},
       {"id":"technical","label":"Ky thuat","description":"Kien truc, code quality, kha nang van hanh","maxScore":100,"weight":35},
       {"id":"prototype","label":"Prototype","description":"Do hoan thien cua ban demo","maxScore":100,"weight":25},
       {"id":"presentation","label":"Presentation","description":"Trinh bay ro rang va tra loi cau hoi","maxScore":100,"weight":15}
     ]$$),
-    (2, now(), now(), 1, 2, 'https://example.com/guidelines/se-r2.pdf', '2026-07-28 23:59:00',
+    (2, now(), now(), 1, 2, 'https://example.com/guidelines/se-r2.pdf', now() - interval '1 day', '2026-07-28 23:59:00',
     $$[
       {"id":"presentation","label":"Presentation","description":"Storytelling, slide, Q&A","maxScore":100,"weight":30},
       {"id":"innovation","label":"Tinh sang tao","description":"Cach tiep can moi va khac biet","maxScore":100,"weight":20},
       {"id":"technical","label":"Ky thuat","description":"Tinh on dinh, bao mat, kha nang mo rong","maxScore":100,"weight":30},
       {"id":"impact","label":"Tinh ung dung","description":"Gia tri thuc te va kha nang trien khai","maxScore":100,"weight":20}
     ]$$),
-    (3, now(), now(), 2, 1, 'https://example.com/guidelines/ai-r1.pdf', '2026-07-24 23:59:00',
+    (3, now(), now(), 2, 1, 'https://example.com/guidelines/ai-r1.pdf', now() - interval '1 day', '2026-07-24 23:59:00',
     $$[
       {"id":"data","label":"Du lieu","description":"Chat luong du lieu va cach xu ly","maxScore":100,"weight":25},
       {"id":"model","label":"Model","description":"Lua chon mo hinh, prompt, evaluation","maxScore":100,"weight":35},
       {"id":"product","label":"San pham","description":"Trai nghiem nguoi dung va tinh hoan thien","maxScore":100,"weight":25},
       {"id":"presentation","label":"Presentation","description":"Trinh bay va Q&A","maxScore":100,"weight":15}
     ]$$),
-    (4, now(), now(), 2, 2, 'https://example.com/guidelines/ai-r2.pdf', '2026-07-28 23:59:00',
+    (4, now(), now(), 2, 2, 'https://example.com/guidelines/ai-r2.pdf', now() - interval '1 day', '2026-07-28 23:59:00',
     $$[
       {"id":"presentation","label":"Presentation","description":"Storytelling, demo flow, Q&A","maxScore":100,"weight":25},
       {"id":"innovation","label":"Tinh sang tao","description":"Muc do moi cua ung dung AI","maxScore":100,"weight":25},

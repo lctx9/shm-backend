@@ -8,6 +8,7 @@ import java.util.Set;
 @Data
 public class MatrixUpdateRequest {
     private String guidelineUrl;
+    private LocalDateTime submissionStartDate;
     private LocalDateTime submissionDeadline;
     private String scoringCriteriaJson;
     private Set<Long> mentorIds;

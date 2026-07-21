@@ -52,6 +52,9 @@ public class SubmissionService {
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
+            throw new AppException(ErrorCode.SUBMISSION_NOT_STARTED);
+        }
         if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
             throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }
@@ -100,6 +103,9 @@ public class SubmissionService {
         }
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
+            throw new AppException(ErrorCode.SUBMISSION_NOT_STARTED);
+        }
         if (matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
             throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }

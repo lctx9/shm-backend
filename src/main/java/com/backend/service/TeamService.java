@@ -408,7 +408,7 @@ public class TeamService {
     }
 
     public List<TeamJoinRequestResponse> getPendingInvitationsSent(Long teamId) {
-        TeamMember leader = getCurrentMembership();
+        TeamMember leader = getCurrentMembership(teamId);
         if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được xem lời mời đã gửi");
         }

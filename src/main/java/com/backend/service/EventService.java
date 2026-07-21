@@ -312,7 +312,13 @@ public class EventService {
             throw new RuntimeException("Một tài khoản không thể vừa làm Mentor vừa làm Judge cho cùng một bảng đấu");
         }
 
+        if (request.getSubmissionStartDate() != null && request.getSubmissionDeadline() != null
+                && request.getSubmissionStartDate().isAfter(request.getSubmissionDeadline())) {
+            throw new RuntimeException("Thời gian mở nộp bài không được sau hạn nộp bài");
+        }
+
         matrix.setGuidelineUrl(request.getGuidelineUrl());
+        matrix.setSubmissionStartDate(request.getSubmissionStartDate());
         matrix.setSubmissionDeadline(request.getSubmissionDeadline());
         matrix.setScoringCriteriaJson(request.getScoringCriteriaJson());
         matrix.setTopN(request.getTopN());
@@ -442,6 +448,7 @@ public class EventService {
                 .finalRound(matrix.getTrack() == null)
                 .topN(matrix.getTopN())
                 .guidelineUrl(matrix.getGuidelineUrl())
+                .submissionStartDate(matrix.getSubmissionStartDate())
                 .submissionDeadline(matrix.getSubmissionDeadline())
                 .scoringCriteriaJson(matrix.getScoringCriteriaJson())
                 .mentors(matrix.getMentors() == null ? List.of() : matrix.getMentors().stream().map(this::toPublicStaff).toList())
