@@ -11,4 +11,5 @@ import java.util.List;
 public interface HackathonEventRepository extends JpaRepository<HackathonEvent, Long> {
     List<HackathonEvent> findByIsActiveTrue();
     long countByIsActiveTrue();
+    boolean existsByName(String name);
 }

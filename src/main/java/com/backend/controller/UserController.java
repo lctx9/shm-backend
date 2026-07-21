@@ -151,7 +151,7 @@ public class UserController {
     }
 
     private ResponseEntity<Map<String, Object>> achievementResponseFor(User user) {
-        List<AchievementResponse> achievements = teamMemberRepository.findByUser(user).stream()
+        List<AchievementResponse> achievements = teamMemberRepository.findAllByUser(user).stream()
                 .flatMap(member -> prizeRepository.findByTeamId(member.getTeam().getId()).stream())
                 .map(this::toAchievement)
                 .toList();
