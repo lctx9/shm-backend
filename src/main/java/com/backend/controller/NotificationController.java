@@ -109,8 +109,30 @@ public class NotificationController {
         return ApiResponse.<String>builder().result("Đã đọc tất cả thông báo").build();
     }
 
+    @DeleteMapping("/{id}")
+    @Transactional
+    public ApiResponse<String> deleteNotification(@PathVariable Long id) {
+        User currentUser = getCurrentUser();
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông báo"));
+
+        if (!isVisibleTo(notification, currentUser)) {
+            throw new RuntimeException("Bạn không có quyền xóa thông báo này");
+        }
+
+        List<NotificationRead> reads = notificationReadRepository.findAll().stream()
+                .filter(r -> r.getNotification() != null && r.getNotification().getId().equals(id))
+                .toList();
+        if (!reads.isEmpty()) {
+            notificationReadRepository.deleteAll(reads);
+        }
+
+        notificationRepository.delete(notification);
+        return ApiResponse.<String>builder().result("Đã xóa thông báo").build();
+    }
+
     /**
-     * Xóa/Đánh dấu đọc tất cả thông báo hiển thị của người dùng hiện tại mà không làm hỏng dữ liệu liên quan hay gây lỗi FK DB.
+     * Xóa tất cả thông báo hiển thị của người dùng hiện tại khỏi Database.
      */
     @DeleteMapping("/my")
     @Transactional
@@ -125,18 +147,16 @@ public class NotificationController {
             return ApiResponse.<String>builder().result("Đã xóa tất cả thông báo").build();
         }
 
-        Set<Long> readIds = notificationReadRepository
-                .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList())
-                .stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
+        List<Long> visibleIds = visible.stream().map(Notification::getId).toList();
 
-        List<NotificationRead> newReads = visible.stream()
-                .filter(item -> !readIds.contains(item.getId()))
-                .map(item -> NotificationRead.builder().notification(item).user(currentUser).build())
+        List<NotificationRead> reads = notificationReadRepository.findAll().stream()
+                .filter(r -> r.getNotification() != null && visibleIds.contains(r.getNotification().getId()))
                 .toList();
-
-        if (!newReads.isEmpty()) {
-            notificationReadRepository.saveAll(newReads);
+        if (!reads.isEmpty()) {
+            notificationReadRepository.deleteAll(reads);
         }
+
+        notificationRepository.deleteAll(visible);
 
         return ApiResponse.<String>builder().result("Đã xóa tất cả thông báo khỏi hộp thư của bạn").build();
     }
