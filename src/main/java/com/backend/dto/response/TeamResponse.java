@@ -27,5 +27,9 @@ public class TeamResponse {
     private boolean eligible;
     private String statusLabel;
     private String joinPassword;
+    private String disqualificationStatus;
+    private String disqualificationReason;
+    private String disqualifierEmail;
+    private String rejectionReason;
 }
 
