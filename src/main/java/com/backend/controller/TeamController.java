@@ -37,9 +37,9 @@ public class TeamController {
 
     @GetMapping("/my-team")
     @PreAuthorize("hasRole('USER')")
-    public ApiResponse<TeamResponse> getMyTeam() {
+    public ApiResponse<TeamResponse> getMyTeam(@RequestParam(required = false) Long eventId) {
         return ApiResponse.<TeamResponse>builder()
-                .result(teamService.getMyTeam())
+                .result(teamService.getMyTeam(eventId))
                 .build();
     }
 
@@ -120,8 +120,8 @@ public class TeamController {
     // 3. Rời khỏi đội
     @PostMapping("/leave")
     @PreAuthorize("hasRole('USER')")
-    public ApiResponse<String> leaveTeam() {
-        teamService.leaveTeam();
+    public ApiResponse<String> leaveTeam(@RequestParam(required = false) Long teamId) {
+        teamService.leaveTeam(teamId);
         return ApiResponse.<String>builder()
                 .result("Rời đội thành công!")
                 .build();
