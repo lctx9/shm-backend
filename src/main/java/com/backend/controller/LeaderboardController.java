@@ -21,7 +21,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -106,6 +109,56 @@ public class LeaderboardController {
                     .description(submission.getFeedback())
                     .score(submission.getScore())
                     .members(submission.getTeam() == null ? List.of() : teamMemberRepository.findByTeamId(submission.getTeam().getId()).stream()
+                            .map(this::toMemberResponse)
+                            .toList())
+                    .build());
+        }
+
+        return ApiResponse.<List<LeaderboardResponse>>builder()
+                .result(rows)
+                .build();
+    }
+
+    @GetMapping("/all")
+    public ApiResponse<List<LeaderboardResponse>> getGlobalLeaderboard() {
+        // Get all graded final-round submissions across every event
+        List<Submission> allSubmissions = submissionRepository.findAllFinalRoundGradedSubmissions();
+
+        // Keep best score per team (across all events they participated in)
+        Map<Long, Submission> bestByTeam = new HashMap<>();
+        for (Submission s : allSubmissions) {
+            if (s.getTeam() == null) continue;
+            Long teamId = s.getTeam().getId();
+            double score = s.getScore() != null ? s.getScore() : 0.0;
+            Submission existing = bestByTeam.get(teamId);
+            double existingScore = existing != null && existing.getScore() != null ? existing.getScore() : -1.0;
+            if (score > existingScore) {
+                bestByTeam.put(teamId, s);
+            }
+        }
+
+        // Sort by score desc, then by submission time asc
+        List<Submission> sorted = bestByTeam.values().stream()
+                .sorted(Comparator
+                        .comparingDouble((Submission s) -> s.getScore() != null ? s.getScore() : 0.0).reversed()
+                        .thenComparing(s -> s.getCreatedAt() != null ? s.getCreatedAt() : java.time.LocalDateTime.MIN))
+                .toList();
+
+        AtomicInteger rank = new AtomicInteger(1);
+        List<LeaderboardResponse> rows = new ArrayList<>();
+        for (Submission s : sorted) {
+            HackathonEvent event = s.getMatrix() != null && s.getMatrix().getRound() != null
+                    ? s.getMatrix().getRound().getEvent() : null;
+            rows.add(LeaderboardResponse.builder()
+                    .id(s.getId())
+                    .rank(rank.getAndIncrement())
+                    .eventId(event != null ? event.getId() : null)
+                    .eventName(event != null ? event.getName() : "Không rõ")
+                    .eventYear(event != null ? event.getYear() : null)
+                    .teamName(s.getTeam().getName())
+                    .track("Tổng hợp")
+                    .score(s.getScore())
+                    .members(teamMemberRepository.findByTeamId(s.getTeam().getId()).stream()
                             .map(this::toMemberResponse)
                             .toList())
                     .build());

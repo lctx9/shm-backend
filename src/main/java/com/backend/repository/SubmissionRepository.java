@@ -15,6 +15,9 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
             "AND s.matrix.round.event.id = :eventId " +
             "AND s.matrix.track IS NULL")
     List<Submission> findFinalRoundGradedSubmissions(@org.springframework.data.repository.query.Param("eventId") Long eventId);
-    
+    @org.springframework.data.jpa.repository.Query("SELECT s FROM Submission s WHERE s.isGraded = true " +
+            "AND s.matrix.track IS NULL")
+    List<Submission> findAllFinalRoundGradedSubmissions();
+
     long countByIsGradedFalse();
 }
