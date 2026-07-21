@@ -414,8 +414,12 @@ public class TeamService {
         if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được xem lời mời đã gửi");
         }
-
-        return teamJoinRequestRepository.findByTeamIdAndTypeAndStatus(teamId, "INVITATION", "PENDING").stream()
+        // Trả về cả PENDING (đang chờ) lẫn REJECTED (đã từ chối)
+        // để frontend hiển thị trạng thái và cho phép mời lại
+        return teamJoinRequestRepository.findByTeamId(teamId).stream()
+                .filter(r -> "INVITATION".equals(r.getType())
+                        && ("PENDING".equals(r.getStatus()) || "REJECTED".equals(r.getStatus())))
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
                 .map(this::toJoinRequestResponse)
                 .toList();
     }
@@ -513,55 +517,22 @@ public class TeamService {
         Team team = joinRequest.getTeam();
         List<TeamMember> teamMembers = teamMemberRepository.findByTeamId(team.getId());
 
-        // Đếm số thành viên đã xác nhận (đang trong đội)
-        int confirmedCount = teamMembers.size();
-
-        // Đếm số lời mời PENDING còn lại (không tính lời mời vừa bị từ chối)
-        long remainingPending = teamJoinRequestRepository
-                .findByTeamIdAndTypeAndStatus(team.getId(), "INVITATION", "PENDING")
-                .stream()
-                .filter(r -> !r.getId().equals(requestId))
-                .count();
-
-        // Kiểm tra: nếu (thành viên hiện tại + lời mời còn chờ) < 3
-        // thì dù tất cả lời mời còn lại chấp nhận cũng không đủ → giải tán đội
-        boolean cannotReachMinimum = (confirmedCount + remainingPending) < 3;
-
-        // Thông báo cho leader (nếu đội còn tồn tại sau từ chối)
+        // Thông báo cho leader biết có người từ chối lời mời
+        // Đội không bị giải tán — leader có thể mời lại từ trang chi tiết đội
         TeamMember leader = teamMembers.stream()
                 .filter(m -> m.getRole() == MemberRole.LEADER)
                 .findFirst()
                 .orElse(null);
 
-        if (cannotReachMinimum) {
-            // Đội không thể đủ 3 thành viên → giải tán
-            // Hủy tất cả lời mời PENDING còn lại
-            teamJoinRequestRepository.findByTeamIdAndTypeAndStatus(team.getId(), "INVITATION", "PENDING").forEach(r -> {
-                r.setStatus("CANCELLED");
-                teamJoinRequestRepository.save(r);
-            });
-            // Thông báo cho leader biết đội bị giải tán trước khi xóa
-            if (leader != null) {
-                notificationRepository.save(Notification.builder()
-                        .title("Đội " + team.getName() + " đã bị giải tán")
-                        .body(currentUser.getFullName() + " đã từ chối lời mời. Đội " + team.getName()
-                                + " không đủ thành viên tối thiểu (3 người) nên đã bị tự động giải tán.")
-                        .recipient(leader.getUser())
-                        .actionUrl("/my-team")
-                        .build());
-            }
-            disbandTeam(team);
-        } else {
-            // Đội vẫn có khả năng đủ thành viên → chỉ thông báo cho leader
-            if (leader != null) {
-                notificationRepository.save(Notification.builder()
-                        .title("Lời mời gia nhập đội bị từ chối")
-                        .body(currentUser.getFullName() + " đã từ chối lời mời gia nhập đội " + team.getName() + ".")
-                        .recipient(leader.getUser())
-                        .sender(currentUser)
-                        .actionUrl("/my-team")
-                        .build());
-            }
+        if (leader != null) {
+            notificationRepository.save(Notification.builder()
+                    .title("Lời mời gia nhập đội bị từ chối")
+                    .body(currentUser.getFullName() + " đã từ chối lời mời gia nhập đội " + team.getName()
+                            + ". Bạn có thể mời lại từ trang chi tiết đội.")
+                    .recipient(leader.getUser())
+                    .sender(currentUser)
+                    .actionUrl("/my-team?teamId=" + team.getId())
+                    .build());
         }
     }
 
