@@ -3,6 +3,7 @@ package com.backend.controller;
 import com.backend.dto.request.LoginRequest;
 import com.backend.dto.request.OtpRequest;
 import com.backend.dto.request.RegisterRequest;
+import com.backend.dto.request.VerifyOtpRequest;
 import com.backend.dto.response.ApiResponse;
 import com.backend.dto.response.AuthResponse;
 import com.backend.service.AuthService;
@@ -21,6 +22,17 @@ public class AuthController {
     public ApiResponse<String> sendOtp(@RequestBody @Valid OtpRequest request) {
         return ApiResponse.<String>builder()
                 .result(authService.sendRegistrationOtp(request.getEmail()))
+                .build();
+    }
+
+    /**
+     * Xác thực OTP trung gian — kiểm tra OTP có đúng không mà KHÔNG tiêu thụ nó.
+     * Frontend gọi khi người dùng nhấn "Tiếp tục" ở Bước 1.
+     */
+    @PostMapping("/verify-otp")
+    public ApiResponse<String> verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
+        return ApiResponse.<String>builder()
+                .result(authService.peekVerifyOtp(request.getEmail(), request.getOtp()))
                 .build();
     }
 
