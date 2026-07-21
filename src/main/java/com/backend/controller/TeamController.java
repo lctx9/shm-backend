@@ -126,5 +126,42 @@ public class TeamController {
                 .result("Rời đội thành công!")
                 .build();
     }
+
+    // 4. Lời mời của tôi (Dành cho thành viên được mời)
+    @GetMapping("/my-invitations")
+    @PreAuthorize("hasRole('USER')")
+    public ApiResponse<List<TeamJoinRequestResponse>> getMyInvitations() {
+        return ApiResponse.<List<TeamJoinRequestResponse>>builder()
+                .result(teamService.getMyInvitations())
+                .build();
+    }
+
+    // 5. Chấp nhận lời mời gia nhập đội
+    @PostMapping("/invitations/{requestId}/accept")
+    @PreAuthorize("hasRole('USER')")
+    public ApiResponse<TeamResponse> acceptInvitation(@PathVariable Long requestId) {
+        return ApiResponse.<TeamResponse>builder()
+                .result(teamService.acceptInvitation(requestId))
+                .build();
+    }
+
+    // 6. Từ chối lời mời gia nhập đội
+    @PostMapping("/invitations/{requestId}/reject")
+    @PreAuthorize("hasRole('USER')")
+    public ApiResponse<String> rejectInvitation(@PathVariable Long requestId) {
+        teamService.rejectInvitation(requestId);
+        return ApiResponse.<String>builder()
+                .result("Đã từ chối lời mời gia nhập đội")
+                .build();
+    }
+
+    // 7. Xem danh sách lời mời đã gửi (Dành cho Leader)
+    @GetMapping("/{teamId}/sent-invitations")
+    @PreAuthorize("hasRole('USER')")
+    public ApiResponse<List<TeamJoinRequestResponse>> getSentInvitations(@PathVariable Long teamId) {
+        return ApiResponse.<List<TeamJoinRequestResponse>>builder()
+                .result(teamService.getPendingInvitationsSent(teamId))
+                .build();
+    }
 }
 
