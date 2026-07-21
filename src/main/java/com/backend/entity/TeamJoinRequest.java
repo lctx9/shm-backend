@@ -22,4 +22,7 @@ public class TeamJoinRequest extends BaseEntity {
 
     @Column(nullable = false)
     private String status;
+
+    @Column(name = "type")
+    private String type;
 }

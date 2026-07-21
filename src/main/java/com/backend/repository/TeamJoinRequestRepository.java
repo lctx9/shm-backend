@@ -11,7 +11,10 @@ import java.util.List;
 @Repository
 public interface TeamJoinRequestRepository extends JpaRepository<TeamJoinRequest, Long> {
     List<TeamJoinRequest> findByTeamIdAndStatus(Long teamId, String status);
+    List<TeamJoinRequest> findByTeamIdAndTypeAndStatus(Long teamId, String type, String status);
+    List<TeamJoinRequest> findByUserIdAndTypeAndStatus(Long userId, String type, String status);
     boolean existsByTeamAndUserAndStatus(Team team, User user, String status);
+    boolean existsByTeamAndUserAndTypeAndStatus(Team team, User user, String type, String status);
     List<TeamJoinRequest> findByTeamId(Long teamId);
 }
 
