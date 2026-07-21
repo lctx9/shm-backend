@@ -185,8 +185,8 @@ public class UserController {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
 
-        if (actor.getRole() == RoleType.COORDINATOR && user.getRole() != RoleType.USER) {
-            throw new RuntimeException("Coordinator chỉ được thay đổi trạng thái của tài khoản Thí sinh (USER)");
+        if (actor.getRole() == RoleType.COORDINATOR && (user.getRole() == RoleType.COORDINATOR || user.getRole() == RoleType.ADMIN)) {
+            throw new RuntimeException("Coordinator khong the thay doi trang thai cua Coordinator hoac Admin");
         }
 
         user.setStatus(AccountStatus.valueOf(body.get("status")));
