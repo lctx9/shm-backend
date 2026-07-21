@@ -129,12 +129,17 @@ public class NotificationController {
     }
 
     private boolean isVisibleTo(Notification item, User user) {
-        // Sender can always see notifications they sent
-        if (item.getSender() != null && item.getSender().getId().equals(user.getId())) return true;
+        // Chỉ hiển thị cho người nhận (recipient) hoặc người có role phù hợp
+        // Không hiển thị cho chính người gửi (sender) — tránh việc người tạo đội thấy lời mời mình đã gửi
         boolean recipientMatches = item.getRecipient() == null || item.getRecipient().getId().equals(user.getId());
         boolean roleMatches = item.getTargetRole() == null || item.getTargetRole() == user.getRole()
                 || (isStaffRole(item.getTargetRole()) && isStaffRole(user.getRole()));
-        return recipientMatches && roleMatches;
+        // Nếu notification có recipient cụ thể → chỉ recipient mới thấy, dù sender là ai
+        if (item.getRecipient() != null) {
+            return item.getRecipient().getId().equals(user.getId());
+        }
+        // Broadcast (recipient = null): hiển thị theo role
+        return roleMatches;
     }
 
     private boolean isSenderOrVisible(Notification item, User user) {
