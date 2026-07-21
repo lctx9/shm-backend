@@ -379,6 +379,8 @@ public class EventService {
                 .name(track.getName())
                 .description(track.getDescription())
                 .mentors(track.getMentors() == null ? List.of() : track.getMentors().stream().map(this::toPublicStaff).toList())
+                .maxTeams(track.getMaxTeams())
+                .currentTeamsCount(teamRepository.countByTrackId(track.getId()))
                 .build();
     }
 
@@ -482,6 +484,7 @@ public class EventService {
                             .description("")
                             .event(event)
                             .mentors(resolveUsers(config.getMentorIds(), "mentor"))
+                            .maxTeams(config.getMaxTeams())
                             .build()));
             return;
         }

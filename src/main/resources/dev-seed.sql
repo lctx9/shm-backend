@@ -96,9 +96,9 @@ INSERT INTO events (
     false
 );
 
-INSERT INTO tracks (id, created_at, updated_at, name, description, event_id) VALUES
-    (1, now(), now(), 'Software Engineering', 'Web, mobile, backend, platform and productivity tools', 1),
-    (2, now(), now(), 'AI Application', 'AI-powered products, data apps and automation workflows', 1);
+INSERT INTO tracks (id, created_at, updated_at, name, description, event_id, max_teams) VALUES
+    (1, now(), now(), 'Software Engineering', 'Web, mobile, backend, platform and productivity tools', 1, NULL),
+    (2, now(), now(), 'AI Application', 'AI-powered products, data apps and automation workflows', 1, NULL);
 
 INSERT INTO rounds (id, created_at, updated_at, name, order_index, event_id) VALUES
     (1, now(), now(), 'Round 1 - Prototype', 1, 1),

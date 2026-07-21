@@ -42,6 +42,7 @@ public class SecurityConfig {
                                 "/api/leaderboard/**",
                                 "/api/stats/**",
                                 "/api/events/**",
+                                "/api/rule-templates/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",

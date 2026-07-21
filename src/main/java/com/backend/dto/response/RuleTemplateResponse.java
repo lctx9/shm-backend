@@ -1,21 +1,18 @@
 package com.backend.dto.response;
 
-import java.util.List;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TrackResponse {
+public class RuleTemplateResponse {
     private Long id;
     private String name;
-    private String description;
-    private List<PublicStaffResponse> mentors;
-    private Integer maxTeams;
-    private Long currentTeamsCount;
+    private String content;
+    private LocalDateTime createdAt;
 }
