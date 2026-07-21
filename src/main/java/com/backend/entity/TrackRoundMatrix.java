@@ -23,6 +23,7 @@ public class TrackRoundMatrix extends BaseEntity {
     private Round round;
 
     private String guidelineUrl;
+    private LocalDateTime submissionStartDate;
     private LocalDateTime submissionDeadline;
     private Integer topN;
 

@@ -137,7 +137,7 @@ public class AuthService {
     }
 
     private void verifyRegistrationOtp(String email, String otp) {
-        if (email.startsWith("e2e_") || email.equals("pending@seal.dev") || email.equals("join.request@seal.dev")) {
+        if (email != null && (email.startsWith("e2e_") || email.equals("pending@seal.dev") || email.equals("join.request@seal.dev"))) {
             return; // Bypass OTP check for E2E automated test accounts
         }
         if (otp == null || otp.isBlank()) {

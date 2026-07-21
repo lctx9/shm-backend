@@ -53,11 +53,30 @@ public class TeamService {
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
 
+    private void validateEventOverlap(User user, HackathonEvent newEvent) {
+        List<TeamMember> currentMemberships = teamMemberRepository.findAllByUser(user);
+        for (TeamMember member : currentMemberships) {
+            HackathonEvent existingEvent = member.getTeam().getEvent();
+            if (existingEvent.getId().equals(newEvent.getId())) {
+                throw new RuntimeException("Thành viên " + user.getEmail() + " đã tham gia một đội trong cùng sự kiện này!");
+            }
+            if (existingEvent.getEventStartDate() != null && existingEvent.getEventEndDate() != null &&
+                newEvent.getEventStartDate() != null && newEvent.getEventEndDate() != null) {
+                if (existingEvent.getEventStartDate().isBefore(newEvent.getEventEndDate()) &&
+                    existingEvent.getEventEndDate().isAfter(newEvent.getEventStartDate())) {
+                    throw new RuntimeException("Thành viên " + user.getEmail() + " đang tham gia sự kiện '" + existingEvent.getName() + "' có thời gian thi đấu trùng lặp với sự kiện này!");
+                }
+            }
+        }
+    }
+
     @Transactional
     public TeamResponse createTeam(TeamCreateRequest request) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+
 
         if (teamRepository.existsByName(request.getName())) {
             throw new AppException(ErrorCode.TEAM_EXISTED);
@@ -77,9 +96,7 @@ public class TeamService {
             throw new RuntimeException("Bảng đấu " + track.getName() + " đã đạt giới hạn tối đa " + track.getMaxTeams() + " đội tham gia.");
         }
 
-        if (teamMemberRepository.existsByUserIdAndTeamEventId(currentUser.getId(), event.getId())) {
-            throw new AppException(ErrorCode.ALREADY_IN_TEAM);
-        }
+        validateEventOverlap(currentUser, event);
 
         // Validate memberEmails (must invite at least 2 other members, unique, exists, not already in team)
         List<String> emails = request.getMemberEmails();
@@ -115,9 +132,7 @@ public class TeamService {
                 user.getRole() == com.backend.entity.enums.RoleType.JUDGE) {
                 throw new RuntimeException("Không thể mời tài khoản Ban tổ chức/Staff vào đội thi.");
             }
-            if (teamMemberRepository.existsByUserIdAndTeamEventId(user.getId(), event.getId())) {
-                throw new RuntimeException("Thành viên có email " + email + " đã ở trong một đội khác, không thể mời thành viên này và đội không thể thành lập!");
-            }
+            validateEventOverlap(user, event);
             invitedUsers.add(user);
         }
 
@@ -130,7 +145,9 @@ public class TeamService {
         }
 
         String rawPassword = request.getJoinPassword();
-        String joinPassword = (rawPassword != null && !rawPassword.isBlank()) ? rawPassword : null;
+        String joinPassword = (rawPassword != null && !rawPassword.isBlank())
+                ? passwordEncoder.encode(rawPassword)
+                : null;
 
         Team newTeam = Team.builder()
                 .name(request.getName())
@@ -174,24 +191,27 @@ public class TeamService {
         return teamRepository.findAll().stream().map(t -> toTeamResponse(t, true)).toList();
     }
 
-    public TeamResponse getMyTeam() {
+    public List<TeamResponse> getMyTeams(Long eventId) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        TeamMember myMembership = teamMemberRepository.findByUser(currentUser).orElse(null);
-
-        if (myMembership == null) {
-            return null;
+        List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
+        if (eventId != null) {
+            memberships = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null && m.getTeam().getEvent().getId().equals(eventId))
+                    .toList();
         }
 
-        return toTeamResponse(myMembership.getTeam());
+        return memberships.stream()
+                .map(m -> toTeamResponse(m.getTeam()))
+                .toList();
     }
 
     @Transactional
     public void removeMember(Long teamId, Long memberId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được xoá thành viên");
         }
 
@@ -239,8 +259,8 @@ public class TeamService {
 
     @Transactional
     public TeamResponse inviteMemberByEmail(Long teamId, String email) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được mời thành viên");
         }
 
@@ -297,8 +317,8 @@ public class TeamService {
 
     @Transactional
     public TeamResponse transferLeader(Long teamId, Long memberId) {
-        TeamMember currentLeader = getCurrentMembership();
-        if (!currentLeader.getTeam().getId().equals(teamId) || currentLeader.getRole() != MemberRole.LEADER) {
+        TeamMember currentLeader = getCurrentMembership(teamId);
+        if (currentLeader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader hiện tại mới được chuyển quyền");
         }
 
@@ -379,8 +399,8 @@ public class TeamService {
     }
 
     public List<TeamJoinRequestResponse> getPendingJoinRequests(Long teamId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được xem yêu cầu tham gia");
         }
 
@@ -390,7 +410,7 @@ public class TeamService {
     }
 
     public List<TeamJoinRequestResponse> getPendingInvitationsSent(Long teamId) {
-        TeamMember leader = getCurrentMembership();
+        TeamMember leader = getCurrentMembership(teamId);
         if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được xem lời mời đã gửi");
         }
@@ -510,8 +530,8 @@ public class TeamService {
 
     @Transactional
     public TeamResponse approveJoinRequest(Long teamId, Long requestId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được duyệt yêu cầu tham gia");
         }
 
@@ -575,8 +595,8 @@ public class TeamService {
 
     @Transactional
     public void rejectJoinRequest(Long teamId, Long requestId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được từ chối yêu cầu tham gia");
         }
 
@@ -604,7 +624,7 @@ public class TeamService {
             throw new AppException(ErrorCode.INVALID_JOIN_TYPE);
         }
 
-        if (team.getJoinPassword() == null || !password.equals(team.getJoinPassword())) {
+        if (team.getJoinPassword() == null || !passwordEncoder.matches(password, team.getJoinPassword())) {
             throw new AppException(ErrorCode.WRONG_JOIN_PASSWORD);
         }
 
@@ -698,13 +718,24 @@ public class TeamService {
     }
 
     @Transactional
-    public void leaveTeam() {
+    public void leaveTeam(Long teamId) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        TeamMember myMembership = teamMemberRepository.findByUser(currentUser)
-                .orElseThrow(() -> new RuntimeException("Bạn không ở trong đội nào để rời."));
+        TeamMember myMembership;
+        if (teamId != null) {
+            myMembership = teamMemberRepository.findByUserIdAndTeamId(currentUser.getId(), teamId)
+                    .orElseThrow(() -> new RuntimeException("Bạn không ở trong đội này để rời."));
+        } else {
+            List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
+            if (memberships.isEmpty()) {
+                throw new RuntimeException("Bạn không ở trong đội nào để rời.");
+            }
+            myMembership = memberships.stream()
+                    .max(java.util.Comparator.comparing(m -> m.getTeam().getEvent().getId()))
+                    .orElse(memberships.get(0));
+        }
 
         Team team = myMembership.getTeam();
         List<TeamMember> members = teamMemberRepository.findByTeamId(team.getId());
@@ -755,6 +786,7 @@ public class TeamService {
                 .type(team.getType())
                 .eventId(team.getEvent() == null ? null : team.getEvent().getId())
                 .eventName(team.getEvent() == null ? null : team.getEvent().getName())
+                .eventStartDate(team.getEvent() == null ? null : team.getEvent().getEventStartDate())
                 .trackId(team.getTrack() == null ? null : team.getTrack().getId())
                 .trackName(team.getTrack() == null ? null : team.getTrack().getName())
                 .members(members)
@@ -773,8 +805,8 @@ public class TeamService {
         );
         boolean isSameTeam = false;
         if (!isLobby && currentUser != null) {
-            Optional<TeamMember> currentMembership = teamMemberRepository.findByUser(currentUser);
-            if (currentMembership.isPresent() && currentMembership.get().getTeam().getId().equals(member.getTeam().getId())) {
+            boolean exists = teamMemberRepository.existsByUserIdAndTeamId(currentUser.getId(), member.getTeam().getId());
+            if (exists) {
                 isSameTeam = true;
             }
         }
@@ -820,12 +852,22 @@ public class TeamService {
                 .build();
     }
 
-    private TeamMember getCurrentMembership() {
+    private TeamMember getCurrentMembership(Long teamId) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        return teamMemberRepository.findByUser(currentUser)
-                .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
+        if (teamId != null) {
+            return teamMemberRepository.findByUserIdAndTeamId(currentUser.getId(), teamId)
+                    .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
+        } else {
+            List<TeamMember> memberships = teamMemberRepository.findAllByUser(currentUser);
+            if (memberships.isEmpty()) {
+                throw new AppException(ErrorCode.TEAM_NOT_FOUND);
+            }
+            return memberships.stream()
+                    .max(java.util.Comparator.comparing(m -> m.getTeam().getEvent().getId()))
+                    .orElse(memberships.get(0));
+        }
     }
 }

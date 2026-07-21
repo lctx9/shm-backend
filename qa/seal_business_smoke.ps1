@@ -381,10 +381,6 @@ try {
     $emailB  = "e2e_b_${ts}@fpt.edu.vn"
     $emailC  = "e2e_c_${ts}@fpt.edu.vn"
     $emailD  = "e2e_d_${ts}@fpt.edu.vn"
-    $emailE  = "e2e_e_${ts}@fpt.edu.vn"
-    $emailF  = "e2e_f_${ts}@fpt.edu.vn"
-    $emailG  = "e2e_g_${ts}@fpt.edu.vn"
-    $emailH  = "e2e_h_${ts}@fpt.edu.vn"
     $p2Cleanup.judgeEmail = "e2e_judge_${ts}@seal.dev"
     $p2Cleanup.staffEmail = "e2e_staff_${ts}@seal.dev"
 
@@ -404,7 +400,7 @@ try {
     }
     Add-Result '[E2E] Đăng ký trùng email phải trả lỗi' ($regDup.Status -ne 200) "HTTP $($regDup.Status)"
 
-    foreach ($em in @($emailB,$emailC,$emailD,$emailE,$emailF,$emailG,$emailH)) {
+    foreach ($em in @($emailB,$emailC,$emailD)) {
         Invoke-SealApi -Method POST -Path '/auth/register' -Body @{
             email=$em; password='E2ePass@1'; fullName="E2E Student ${em}"
             studentId="ES$(Get-Random -Max 999999)"; universityName='FPT University'; isFptStudent=$true
@@ -413,15 +409,17 @@ try {
 
     # ── Phê duyệt sinh viên ────────────────────────────────
     $allU = (Invoke-SealApi -Method GET -Path '/users' -Token $coord.token).Json.result
-    $students = $allU | Where-Object { $_.email -like "e2e_*_${ts}@fpt.edu.vn" }
-    foreach ($stu in $students) {
-        Invoke-SealApi -Method PUT -Path "/users/$($stu.id)/status" -Body @{ status='APPROVED' } -Token $coord.token | Out-Null
-    }
-    $stuA = $students | Where-Object { $_.email -eq $emailA } | Select-Object -First 1
-    $stuB = $students | Where-Object { $_.email -eq $emailB } | Select-Object -First 1
+    $stuA = $allU | Where-Object { $_.email -eq $emailA } | Select-Object -First 1
+    $stuB = $allU | Where-Object { $_.email -eq $emailB } | Select-Object -First 1
+    $stuC = $allU | Where-Object { $_.email -eq $emailC } | Select-Object -First 1
+    $stuD = $allU | Where-Object { $_.email -eq $emailD } | Select-Object -First 1
     $p2Cleanup.stuAId = if ($stuA) { $stuA.id } else { $null }
     $p2Cleanup.stuBId = if ($stuB) { $stuB.id } else { $null }
-    Add-Result '[E2E] Coordinator phê duyệt sinh viên' ($students.Count -eq 8) "Approved $($students.Count)/8 students"
+
+    foreach ($stu in @($stuA,$stuB,$stuC,$stuD)) {
+        if ($stu) { Invoke-SealApi -Method PUT -Path "/users/$($stu.id)/status" -Body @{ status='APPROVED' } -Token $coord.token | Out-Null }
+    }
+    Add-Result '[E2E] Coordinator phê duyệt sinh viên' ($stuA -and $stuB -and $stuC -and $stuD) "stuA=$($stuA.id) stuB=$($stuB.id) stuC=$($stuC.id) stuD=$($stuD.id)"
 
     $blockedCoordBanAdmin = Invoke-SealApi -Method PUT -Path '/users/1/status' -Body @{ status='BANNED' } -Token $coord.token
     Add-Result '[E2E] Coordinator không ban Admin phải bị từ chối' ($blockedCoordBanAdmin.Status -ne 200) "HTTP $($blockedCoordBanAdmin.Status)"
@@ -431,11 +429,7 @@ try {
     $tokB = (Login-Seal $emailB 'E2ePass@1').token
     $tokC = (Login-Seal $emailC 'E2ePass@1').token
     $tokD = (Login-Seal $emailD 'E2ePass@1').token
-    $tokE = (Login-Seal $emailE 'E2ePass@1').token
-    $tokF = (Login-Seal $emailF 'E2ePass@1').token
-    $tokG = (Login-Seal $emailG 'E2ePass@1').token
-    $tokH = (Login-Seal $emailH 'E2ePass@1').token
-    Add-Result '[E2E] Sinh viên đăng nhập sau phê duyệt' ($tokA -and $tokB -and $tokC -and $tokD -and $tokE -and $tokF -and $tokG -and $tokH) "8/8 students logged in"
+    Add-Result '[E2E] Sinh viên đăng nhập sau phê duyệt' ($tokA -and $tokB -and $tokC -and $tokD) "4/4 students logged in"
 
     # ── Đổi mật khẩu ──────────────────────────────────────
     $pwChange = Invoke-SealApi -Method PUT -Path '/users/change-password' -Body @{ oldPassword='E2ePass@1'; newPassword='NewE2e@99' } -Token $tokA
@@ -446,7 +440,7 @@ try {
 
     # ── Tạo tài khoản nhân sự ─────────────────────────────
     $rJudge = Invoke-SealApi -Method POST -Path '/users/staff' -Body @{
-        fullName='E2E Judge'; email=$p2Cleanup.judgeEmail; password='Judge@1234'; role='STAFF'
+        fullName='E2E Judge'; email=$p2Cleanup.judgeEmail; password='Judge@1234'; role='JUDGE'
     } -Token $coord.token
     Add-Result '[E2E] Tạo tài khoản JUDGE' ($rJudge.Status -eq 200) "HTTP $($rJudge.Status)"
 
@@ -466,9 +460,7 @@ try {
     $evRes = Invoke-SealApi -Method POST -Path '/events' -Body @{
         name="E2E Event ${ts}"; description='Auto E2E'; year=2026
         isActive=$true; resultsPublished=$false
-        regStartDate='2026-01-01T00:00:00'; regEndDate='2026-07-21T23:59:59'
-        eventStartDate='2026-07-21T23:59:59'; eventEndDate='2026-12-31T23:59:59'
-        submissionDeadline='2026-12-31T23:59:59'; roundCount=2; season='SUMMER'
+        regStartDate='2026-01-01T00:00:00'; regEndDate='2030-12-31T23:59:59'
     } -Token $coord.token
     Add-Result '[E2E] Tạo sự kiện mới' ($evRes.Status -eq 200) "HTTP $($evRes.Status)"
     $evId = if ($evRes.Status -eq 200) { $evRes.Json.result.id } else { $null }
@@ -497,54 +489,31 @@ try {
         # ── Tạo đội ───────────────────────────────────────
         $rTA = Invoke-SealApi -Method POST -Path '/teams/create' -Body @{
             name="Team A ${ts}"; description='Public'; type='PUBLIC'
-            eventId=$evId; trackId=$trackId; memberEmails=@($emailB, $emailC)
+            eventId=$evId; trackId=$trackId; inviteEmails=@()
         } -Token $tokA
         Add-Result '[E2E] Sinh viên A tạo đội PUBLIC' ($rTA.Status -eq 200) "HTTP $($rTA.Status)"
         $p2Cleanup.teamAId = if ($rTA.Status -eq 200) { $rTA.Json.result.id } else { $null }
 
         $rTA2 = Invoke-SealApi -Method POST -Path '/teams/create' -Body @{
-            name='Dup Team'; description='x'; type='PUBLIC'; eventId=$evId; memberEmails=@($emailB, $emailC)
+            name='Dup Team'; description='x'; type='PUBLIC'; eventId=$evId; inviteEmails=@()
         } -Token $tokA
         Add-Result '[E2E] Tạo đội thứ 2 cùng event phải bị từ chối' ($rTA2.Status -ne 200) "HTTP $($rTA2.Status)"
 
         $rTB = Invoke-SealApi -Method POST -Path '/teams/create' -Body @{
             name="Team B ${ts}"; description='Private'; type='PRIVATE'
-            joinPassword='pin9988'; eventId=$evId; trackId=$trackId; memberEmails=@($emailF, $emailG)
-        } -Token $tokE
+            joinPassword='pin9988'; eventId=$evId; trackId=$trackId; inviteEmails=@()
+        } -Token $tokC
         Add-Result '[E2E] Sinh viên C tạo đội PRIVATE' ($rTB.Status -eq 200) "HTTP $($rTB.Status)"
         $p2Cleanup.teamBId = if ($rTB.Status -eq 200) { $rTB.Json.result.id } else { $null }
 
-        # Accept invitations for Team A
-        $teamAId = $p2Cleanup.teamAId
-        if ($teamAId) {
-            $invB = (Invoke-SealApi -Method GET -Path '/teams/my-invitations' -Token $tokB).Json.result
-            if ($invB -and $invB.Count -gt 0) {
-                Invoke-SealApi -Method POST -Path "/teams/invitations/$($invB[0].id)/accept" -Token $tokB | Out-Null
-            }
-            $invC = (Invoke-SealApi -Method GET -Path '/teams/my-invitations' -Token $tokC).Json.result
-            if ($invC -and $invC.Count -gt 0) {
-                Invoke-SealApi -Method POST -Path "/teams/invitations/$($invC[0].id)/accept" -Token $tokC | Out-Null
-            }
-        }
-
-        # Accept invitations for Team B
-        $teamBId = $p2Cleanup.teamBId
-        if ($teamBId) {
-            $invF = (Invoke-SealApi -Method GET -Path '/teams/my-invitations' -Token $tokF).Json.result
-            if ($invF -and $invF.Count -gt 0) {
-                Invoke-SealApi -Method POST -Path "/teams/invitations/$($invF[0].id)/accept" -Token $tokF | Out-Null
-            }
-            $invG = (Invoke-SealApi -Method GET -Path '/teams/my-invitations' -Token $tokG).Json.result
-            if ($invG -and $invG.Count -gt 0) {
-                Invoke-SealApi -Method POST -Path "/teams/invitations/$($invG[0].id)/accept" -Token $tokG | Out-Null
-            }
-        }
-
         # ── Gia nhập đội ──────────────────────────────────
+        $teamAId = $p2Cleanup.teamAId
+        $teamBId = $p2Cleanup.teamBId
+
         if ($teamAId) {
-            $joinReq = Invoke-SealApi -Method POST -Path "/teams/${teamAId}/join-request" -Token $tokD
+            $joinReq = Invoke-SealApi -Method POST -Path "/teams/${teamAId}/join-request" -Token $tokB
             Add-Result '[E2E] Sinh viên B gửi yêu cầu gia nhập đội A' ($joinReq.Status -eq 200) "HTTP $($joinReq.Status)"
-            $joinReqDup = Invoke-SealApi -Method POST -Path "/teams/${teamAId}/join-request" -Token $tokD
+            $joinReqDup = Invoke-SealApi -Method POST -Path "/teams/${teamAId}/join-request" -Token $tokB
             Add-Result '[E2E] Gửi lại yêu cầu gia nhập phải bị từ chối' ($joinReqDup.Status -ne 200) "HTTP $($joinReqDup.Status)"
 
             $joinReqs = (Invoke-SealApi -Method GET -Path "/teams/${teamAId}/join-requests" -Token $tokA).Json.result
@@ -555,13 +524,13 @@ try {
         }
 
         if ($teamBId) {
-            $joinWrongPin = Invoke-SealApi -Method POST -Path "/teams/${teamBId}/join-private" -Body @{ password='wrongpin' } -Token $tokH
+            $joinWrongPin = Invoke-SealApi -Method POST -Path "/teams/${teamBId}/join-private" -Body @{ password='wrongpin' } -Token $tokD
             Add-Result '[E2E] Gia nhập đội PRIVATE sai PIN phải bị từ chối' ($joinWrongPin.Status -ne 200) "HTTP $($joinWrongPin.Status)"
 
-            $joinOkPin = Invoke-SealApi -Method POST -Path "/teams/${teamBId}/join-private" -Body @{ password='pin9988' } -Token $tokH
+            $joinOkPin = Invoke-SealApi -Method POST -Path "/teams/${teamBId}/join-private" -Body @{ password='pin9988' } -Token $tokD
             Add-Result '[E2E] Gia nhập đội PRIVATE đúng PIN thành công' ($joinOkPin.Status -eq 200) "HTTP $($joinOkPin.Status)"
 
-            $joinAgain = Invoke-SealApi -Method POST -Path "/teams/${teamBId}/join-private" -Body @{ password='pin9988' } -Token $tokH
+            $joinAgain = Invoke-SealApi -Method POST -Path "/teams/${teamBId}/join-private" -Body @{ password='pin9988' } -Token $tokD
             Add-Result '[E2E] Gia nhập đội lần 2 phải bị từ chối (đã là thành viên)' ($joinAgain.Status -ne 200) "HTTP $($joinAgain.Status)"
         }
 
@@ -588,7 +557,7 @@ try {
         if ($teamBId -and $mx1Id) {
             $rSubB = Invoke-SealApi -Method POST -Path '/submissions' -Body @{
                 teamId=$teamBId; matrixId=$mx1Id; fileUrl='https://github.com/team-b/v1'
-            } -Token $tokE
+            } -Token $tokC
             Add-Result '[E2E] Đội B nộp bài Vòng 1' ($rSubB.Status -eq 200) "HTTP $($rSubB.Status)"
             $subB = if ($rSubB.Status -eq 200) { $rSubB.Json.result } else { $null }
         }
@@ -694,7 +663,7 @@ try {
     } -Token $tokA
     Add-Result '[E2E] Sinh viên gửi broadcast phải bị từ chối' ($stuBroadFail.Status -ne 200) "HTTP $($stuBroadFail.Status)"
 
-    $readAll = Invoke-SealApi -Method PATCH -Path '/notifications/read-all' -Token $tokA
+    $readAll = Invoke-SealApi -Method PUT -Path '/notifications/read-all' -Token $tokA
     Add-Result '[E2E] Đánh dấu tất cả thông báo đã đọc' ($readAll.Status -eq 200) "HTTP $($readAll.Status)"
 
     # ── Audit Logs ─────────────────────────────────────────
@@ -707,11 +676,11 @@ try {
     $ruleList = Invoke-SealApi -Method GET -Path '/rule-templates'
     Add-Result '[E2E] Lấy rule templates (public)' ($ruleList.Status -eq 200) "HTTP $($ruleList.Status)"
     $ruleCreate = Invoke-SealApi -Method POST -Path '/rule-templates' -Body @{
-        name="Rule E2E ${ts}"; content='Nội dung quy tắc E2E'
+        title="Rule E2E ${ts}"; content='Nội dung quy tắc E2E'
     } -Token $coord.token
     Add-Result '[E2E] Coordinator tạo rule template' ($ruleCreate.Status -eq 200) "HTTP $($ruleCreate.Status)"
     $ruleId = if ($ruleCreate.Status -eq 200 -and $ruleCreate.Json.result) { $ruleCreate.Json.result.id } else { $null }
-    $ruleStuFail = Invoke-SealApi -Method POST -Path '/rule-templates' -Body @{ name='Hack'; content='x' } -Token $tokA
+    $ruleStuFail = Invoke-SealApi -Method POST -Path '/rule-templates' -Body @{ title='Hack'; content='x' } -Token $tokA
     Add-Result '[E2E] Sinh viên tạo rule template phải bị từ chối' ($ruleStuFail.Status -ne 200) "HTTP $($ruleStuFail.Status)"
     if ($ruleId) {
         Invoke-SealApi -Method DELETE -Path "/rule-templates/${ruleId}" -Token $coord.token | Out-Null
@@ -725,7 +694,7 @@ try {
         Add-Result '[E2E] Thành viên gửi tin nhắn chat' ($chatSend.Status -eq 200) "HTTP $($chatSend.Status)"
         $chatCoord = Invoke-SealApi -Method GET -Path "/chat/teams/$($p2Cleanup.teamAId)" -Token $coord.token
         Add-Result '[E2E] Coordinator xem chat bất kỳ đội' ($chatCoord.Status -eq 200) "HTTP $($chatCoord.Status)"
-        $chatForbid = Invoke-SealApi -Method GET -Path "/chat/teams/$($p2Cleanup.teamAId)" -Token $tokH
+        $chatForbid = Invoke-SealApi -Method GET -Path "/chat/teams/$($p2Cleanup.teamAId)" -Token $tokD
         Add-Result '[E2E] Người ngoài đội xem chat phải bị từ chối' ($chatForbid.Status -ne 200) "HTTP $($chatForbid.Status)"
     }
 
