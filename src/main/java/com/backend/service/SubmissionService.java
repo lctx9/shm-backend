@@ -67,8 +67,13 @@ public class SubmissionService {
         return toSubmissionResponse(submissionRepository.save(submission));
     }
 
-    public SubmissionResponse getMySubmission() {
-        Team team = getCurrentUserTeam();
+    public SubmissionResponse getMySubmission(Long teamId, Long eventId) {
+        Team team = null;
+        if (teamId != null) {
+            team = teamRepository.findById(teamId).orElse(null);
+        } else {
+            team = getCurrentUserTeam(eventId);
+        }
         if (team == null) {
             return null;
         }
@@ -121,10 +126,27 @@ public class SubmissionService {
                 .toList();
     }
 
-    private Team getCurrentUserTeam() {
+    private Team getCurrentUserTeam(Long eventId) {
         User currentUser = getCurrentUser();
-        TeamMember membership = teamMemberRepository.findByUser(currentUser).orElse(null);
-        return membership == null ? null : membership.getTeam();
+        List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
+        if (memberships.isEmpty()) {
+            return null;
+        }
+
+        TeamMember target = null;
+        if (eventId != null) {
+            target = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null && m.getTeam().getEvent().getId().equals(eventId))
+                    .findFirst()
+                    .orElse(null);
+        } else {
+            target = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null)
+                    .max(Comparator.comparing(m -> m.getTeam().getEvent().getId()))
+                    .orElse(memberships.get(0));
+        }
+
+        return target == null ? null : target.getTeam();
     }
 
     private User getCurrentUser() {
@@ -141,9 +163,9 @@ public class SubmissionService {
     }
 
     private void requireTeamLeader(Long teamId) {
-        TeamMember membership = teamMemberRepository.findByUser(getCurrentUser())
+        TeamMember membership = teamMemberRepository.findByUserIdAndTeamId(getCurrentUser().getId(), teamId)
                 .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
-        if (!membership.getTeam().getId().equals(teamId) || membership.getRole() != MemberRole.LEADER) {
+        if (membership.getRole() != MemberRole.LEADER) {
             throw new AppException(ErrorCode.NOT_TEAM_LEADER);
         }
     }

@@ -174,24 +174,40 @@ public class TeamService {
         return teamRepository.findAll().stream().map(t -> toTeamResponse(t, true)).toList();
     }
 
-    public TeamResponse getMyTeam() {
+    public TeamResponse getMyTeam(Long eventId) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        TeamMember myMembership = teamMemberRepository.findByUser(currentUser).orElse(null);
-
-        if (myMembership == null) {
+        List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
+        if (memberships.isEmpty()) {
             return null;
         }
 
-        return toTeamResponse(myMembership.getTeam());
+        TeamMember targetMembership = null;
+        if (eventId != null) {
+            targetMembership = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null && m.getTeam().getEvent().getId().equals(eventId))
+                    .findFirst()
+                    .orElse(null);
+        } else {
+            targetMembership = memberships.stream()
+                    .filter(m -> m.getTeam() != null && m.getTeam().getEvent() != null)
+                    .max(java.util.Comparator.comparing(m -> m.getTeam().getEvent().getId()))
+                    .orElse(memberships.get(0));
+        }
+
+        if (targetMembership == null) {
+            return null;
+        }
+
+        return toTeamResponse(targetMembership.getTeam());
     }
 
     @Transactional
     public void removeMember(Long teamId, Long memberId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được xoá thành viên");
         }
 
@@ -239,8 +255,8 @@ public class TeamService {
 
     @Transactional
     public TeamResponse inviteMemberByEmail(Long teamId, String email) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được mời thành viên");
         }
 
@@ -292,8 +308,8 @@ public class TeamService {
 
     @Transactional
     public TeamResponse transferLeader(Long teamId, Long memberId) {
-        TeamMember currentLeader = getCurrentMembership();
-        if (!currentLeader.getTeam().getId().equals(teamId) || currentLeader.getRole() != MemberRole.LEADER) {
+        TeamMember currentLeader = getCurrentMembership(teamId);
+        if (currentLeader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader hiện tại mới được chuyển quyền");
         }
 
@@ -373,8 +389,8 @@ public class TeamService {
     }
 
     public List<TeamJoinRequestResponse> getPendingJoinRequests(Long teamId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được xem yêu cầu tham gia");
         }
 
@@ -385,8 +401,8 @@ public class TeamService {
 
     @Transactional
     public TeamResponse approveJoinRequest(Long teamId, Long requestId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được duyệt yêu cầu tham gia");
         }
 
@@ -428,8 +444,8 @@ public class TeamService {
 
     @Transactional
     public void rejectJoinRequest(Long teamId, Long requestId) {
-        TeamMember leader = getCurrentMembership();
-        if (!leader.getTeam().getId().equals(teamId) || leader.getRole() != MemberRole.LEADER) {
+        TeamMember leader = getCurrentMembership(teamId);
+        if (leader.getRole() != MemberRole.LEADER) {
             throw new RuntimeException("Chỉ Team Leader của đội mới được từ chối yêu cầu tham gia");
         }
 
@@ -543,13 +559,24 @@ public class TeamService {
     }
 
     @Transactional
-    public void leaveTeam() {
+    public void leaveTeam(Long teamId) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        TeamMember myMembership = teamMemberRepository.findByUser(currentUser)
-                .orElseThrow(() -> new RuntimeException("Bạn không ở trong đội nào để rời."));
+        TeamMember myMembership;
+        if (teamId != null) {
+            myMembership = teamMemberRepository.findByUserIdAndTeamId(currentUser.getId(), teamId)
+                    .orElseThrow(() -> new RuntimeException("Bạn không ở trong đội này để rời."));
+        } else {
+            List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
+            if (memberships.isEmpty()) {
+                throw new RuntimeException("Bạn không ở trong đội nào để rời.");
+            }
+            myMembership = memberships.stream()
+                    .max(java.util.Comparator.comparing(m -> m.getTeam().getEvent().getId()))
+                    .orElse(memberships.get(0));
+        }
 
         Team team = myMembership.getTeam();
         List<TeamMember> members = teamMemberRepository.findByTeamId(team.getId());
@@ -618,8 +645,8 @@ public class TeamService {
         );
         boolean isSameTeam = false;
         if (!isLobby && currentUser != null) {
-            Optional<TeamMember> currentMembership = teamMemberRepository.findByUser(currentUser);
-            if (currentMembership.isPresent() && currentMembership.get().getTeam().getId().equals(member.getTeam().getId())) {
+            boolean exists = teamMemberRepository.existsByUserIdAndTeamId(currentUser.getId(), member.getTeam().getId());
+            if (exists) {
                 isSameTeam = true;
             }
         }
@@ -650,12 +677,22 @@ public class TeamService {
                 .build();
     }
 
-    private TeamMember getCurrentMembership() {
+    private TeamMember getCurrentMembership(Long teamId) {
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        return teamMemberRepository.findByUser(currentUser)
-                .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
+        if (teamId != null) {
+            return teamMemberRepository.findByUserIdAndTeamId(currentUser.getId(), teamId)
+                    .orElseThrow(() -> new AppException(ErrorCode.TEAM_NOT_FOUND));
+        } else {
+            List<TeamMember> memberships = teamMemberRepository.findByUser(currentUser);
+            if (memberships.isEmpty()) {
+                throw new AppException(ErrorCode.TEAM_NOT_FOUND);
+            }
+            return memberships.stream()
+                    .max(java.util.Comparator.comparing(m -> m.getTeam().getEvent().getId()))
+                    .orElse(memberships.get(0));
+        }
     }
 }
