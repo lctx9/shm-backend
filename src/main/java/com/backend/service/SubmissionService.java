@@ -43,6 +43,11 @@ public class SubmissionService {
 
         requireTeamLeader(team.getId());
 
+        long memberCount = teamMemberRepository.countByTeamId(team.getId());
+        if (memberCount < 3) {
+            throw new RuntimeException("Đội thi của bạn chưa đủ điều kiện (tối thiểu 3 thành viên chính thức) để nộp bài dự thi.");
+        }
+
         if (matrix.getTrack() != null && (team.getTrack() == null || !team.getTrack().getId().equals(matrix.getTrack().getId()))) {
             throw new AppException(ErrorCode.BUSINESS_ERROR);
         }

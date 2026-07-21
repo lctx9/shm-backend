@@ -109,6 +109,38 @@ public class NotificationController {
         return ApiResponse.<String>builder().result("Đã đọc tất cả thông báo").build();
     }
 
+    /**
+     * Xóa/Đánh dấu đọc tất cả thông báo hiển thị của người dùng hiện tại mà không làm hỏng dữ liệu liên quan hay gây lỗi FK DB.
+     */
+    @DeleteMapping("/my")
+    @Transactional
+    public ApiResponse<String> deleteAllMyNotifications() {
+        User currentUser = getCurrentUser();
+
+        List<Notification> visible = notificationRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(item -> isSenderOrVisible(item, currentUser))
+                .toList();
+
+        if (visible.isEmpty()) {
+            return ApiResponse.<String>builder().result("Đã xóa tất cả thông báo").build();
+        }
+
+        Set<Long> readIds = notificationReadRepository
+                .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList())
+                .stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
+
+        List<NotificationRead> newReads = visible.stream()
+                .filter(item -> !readIds.contains(item.getId()))
+                .map(item -> NotificationRead.builder().notification(item).user(currentUser).build())
+                .toList();
+
+        if (!newReads.isEmpty()) {
+            notificationReadRepository.saveAll(newReads);
+        }
+
+        return ApiResponse.<String>builder().result("Đã xóa tất cả thông báo khỏi hộp thư của bạn").build();
+    }
+
     private User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));

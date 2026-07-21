@@ -43,6 +43,15 @@ public class TeamController {
                 .build();
     }
 
+    @DeleteMapping("/{teamId}")
+    @PreAuthorize("hasRole('USER')")
+    public ApiResponse<String> disbandTeamByLeader(@PathVariable Long teamId) {
+        teamService.disbandTeamByLeader(teamId);
+        return ApiResponse.<String>builder()
+                .result("Giải tán đội thành công!")
+                .build();
+    }
+
     @DeleteMapping("/{teamId}/members/{memberId}")
     @PreAuthorize("hasRole('USER')")
     public ApiResponse<String> removeMember(@PathVariable Long teamId, @PathVariable Long memberId) {

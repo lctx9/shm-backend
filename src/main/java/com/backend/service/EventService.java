@@ -454,7 +454,7 @@ public class EventService {
                 .submissionFormSchema(event.getSubmissionFormSchema())
                 .competitionRules(event.getCompetitionRules())
                 .ruleDocumentUrl(event.getRuleDocumentUrl())
-                .teamCount(teamRepository.countByEventId(event.getId()))
+                .teamCount(teamRepository.countEligibleTeamsByEventId(event.getId()))
                 .tracks(tracks)
                 .rounds(rounds)
                 .matrices(matrices)

@@ -24,6 +24,8 @@ public class TeamResponse {
     private String trackName;
     private List<TeamMemberResponse> members;
     private int memberCount;
+    private boolean eligible;
+    private String statusLabel;
     private String joinPassword;
 }
 
