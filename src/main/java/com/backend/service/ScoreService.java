@@ -136,18 +136,44 @@ public class ScoreService {
                                 .orElse(null));
         if (nextMatrix == null) return;
 
-        submissions.stream()
-                .sorted(Comparator.comparingDouble(this::averageScore).reversed())
+        // C-03: Sắp xếp đồng nhất với Leaderboard: điểm trung bình giảm dần, nếu bằng điểm thì ai nộp trước (createdAt) xếp hạng cao hơn
+        List<Submission> topSubmissions = submissions.stream()
+                .sorted((s1, s2) -> {
+                    double score1 = averageScore(s1);
+                    double score2 = averageScore(s2);
+                    int scoreCompare = Double.compare(score2, score1);
+                    if (scoreCompare != 0) return scoreCompare;
+                    if (s1.getCreatedAt() == null && s2.getCreatedAt() == null) return 0;
+                    if (s1.getCreatedAt() == null) return 1;
+                    if (s2.getCreatedAt() == null) return -1;
+                    return s1.getCreatedAt().compareTo(s2.getCreatedAt());
+                })
                 .limit(matrix.getTopN())
-                .forEach(item -> {
-                    if (!submissionRepository.existsByTeamIdAndMatrixId(item.getTeam().getId(), nextMatrix.getId())) {
-                        submissionRepository.save(Submission.builder()
-                                .team(item.getTeam())
-                                .matrix(nextMatrix)
-                                .isGraded(false)
-                                .build());
-                    }
-                });
+                .toList();
+
+        List<Long> topTeamIds = topSubmissions.stream().map(s -> s.getTeam().getId()).toList();
+
+        // C-02: Thu hồi thăng hạng các đội bị rớt khỏi top N (chỉ hạ hạng nếu chưa nộp bài và chưa được chấm ở vòng sau)
+        List<Submission> nextRoundSubmissions = submissionRepository.findByMatrixId(nextMatrix.getId());
+        for (Submission nextSub : nextRoundSubmissions) {
+            Long teamId = nextSub.getTeam().getId();
+            if (!topTeamIds.contains(teamId)
+                    && (nextSub.getFileUrl() == null || nextSub.getFileUrl().isBlank())
+                    && !Boolean.TRUE.equals(nextSub.getIsGraded())) {
+                submissionRepository.delete(nextSub);
+            }
+        }
+
+        // Thăng hạng các đội trong top N (tạo bản ghi placeholder nếu chưa có)
+        topSubmissions.forEach(item -> {
+            if (!submissionRepository.existsByTeamIdAndMatrixId(item.getTeam().getId(), nextMatrix.getId())) {
+                submissionRepository.save(Submission.builder()
+                        .team(item.getTeam())
+                        .matrix(nextMatrix)
+                        .isGraded(false)
+                        .build());
+            }
+        });
     }
 
     private double averageScore(Submission submission) {

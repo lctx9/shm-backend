@@ -130,7 +130,9 @@ public class TeamService {
         }
 
         String rawPassword = request.getJoinPassword();
-        String joinPassword = (rawPassword != null && !rawPassword.isBlank()) ? rawPassword : null;
+        String joinPassword = (rawPassword != null && !rawPassword.isBlank())
+                ? passwordEncoder.encode(rawPassword)
+                : null;
 
         Team newTeam = Team.builder()
                 .name(request.getName())
@@ -473,7 +475,7 @@ public class TeamService {
             throw new AppException(ErrorCode.INVALID_JOIN_TYPE);
         }
 
-        if (team.getJoinPassword() == null || !password.equals(team.getJoinPassword())) {
+        if (team.getJoinPassword() == null || !passwordEncoder.matches(password, team.getJoinPassword())) {
             throw new AppException(ErrorCode.WRONG_JOIN_PASSWORD);
         }
 
