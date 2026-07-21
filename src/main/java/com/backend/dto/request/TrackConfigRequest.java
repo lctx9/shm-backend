@@ -8,4 +8,5 @@ import java.util.Set;
 public class TrackConfigRequest {
     private String name;
     private Set<Long> mentorIds;
+    private Integer maxTeams;
 }

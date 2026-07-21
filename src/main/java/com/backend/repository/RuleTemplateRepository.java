@@ -1,15 +1,12 @@
 package com.backend.repository;
 
-import com.backend.entity.Team;
+import com.backend.entity.RuleTemplate;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
 import java.util.Optional;
 
 @Repository
-public interface TeamRepository extends JpaRepository<Team, Long> {
-    Optional<Team> findByName(String name);
+public interface RuleTemplateRepository extends JpaRepository<RuleTemplate, Long> {
+    Optional<RuleTemplate> findByName(String name);
     boolean existsByName(String name);
-    long countByEventId(Long eventId);
-    long countByTrackId(Long trackId);
 }

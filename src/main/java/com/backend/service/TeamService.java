@@ -72,6 +72,11 @@ public class TeamService {
             throw new RuntimeException("Hạng mục thi không thuộc giải đấu đã chọn");
         }
 
+        long currentTeams = teamRepository.countByTrackId(track.getId());
+        if (track.getMaxTeams() != null && track.getMaxTeams() > 0 && currentTeams >= track.getMaxTeams()) {
+            throw new RuntimeException("Bảng đấu " + track.getName() + " đã đạt giới hạn tối đa " + track.getMaxTeams() + " đội tham gia.");
+        }
+
         if (teamMemberRepository.existsByUserIdAndTeamEventId(currentUser.getId(), event.getId())) {
             throw new AppException(ErrorCode.ALREADY_IN_TEAM);
         }
