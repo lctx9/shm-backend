@@ -34,10 +34,7 @@ public class NotificationController {
     public ApiResponse<List<NotificationResponse>> getMyNotifications() {
         User currentUser = getCurrentUser();
         List<Notification> visible = notificationRepository.findAllByOrderByCreatedAtDesc().stream()
-                .filter(item -> item.getRecipient() == null || item.getRecipient().getId().equals(currentUser.getId()))
-                .filter(item -> item.getTargetRole() == null
-                        || item.getTargetRole() == currentUser.getRole()
-                        || (isStaffRole(item.getTargetRole()) && isStaffRole(currentUser.getRole())))
+                .filter(item -> isSenderOrVisible(item, currentUser))
                 .toList();
         if (visible.isEmpty()) {
             return ApiResponse.<List<NotificationResponse>>builder().result(List.of()).build();
@@ -132,10 +129,16 @@ public class NotificationController {
     }
 
     private boolean isVisibleTo(Notification item, User user) {
+        // Sender can always see notifications they sent
+        if (item.getSender() != null && item.getSender().getId().equals(user.getId())) return true;
         boolean recipientMatches = item.getRecipient() == null || item.getRecipient().getId().equals(user.getId());
         boolean roleMatches = item.getTargetRole() == null || item.getTargetRole() == user.getRole()
                 || (isStaffRole(item.getTargetRole()) && isStaffRole(user.getRole()));
         return recipientMatches && roleMatches;
+    }
+
+    private boolean isSenderOrVisible(Notification item, User user) {
+        return isVisibleTo(item, user);
     }
 
     private boolean isStaffRole(RoleType role) {
