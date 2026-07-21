@@ -145,8 +145,9 @@ public class EventService {
             event.setResultsPublished(request.getResultsPublished());
         }
 
-        boolean hasStructure = Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByRoundEventId(eventId) > 0;
-        if (!hasStructure && (request.getTracks() != null || request.getTrackConfigs() != null)) {
+        if (request.getTrackConfigs() != null) {
+            updateEventTracks(event, request.getTrackConfigs());
+        } else if (request.getTracks() != null) {
             trackRepository.deleteAll(trackRepository.findByEventId(eventId));
             saveTracks(event, request);
         }
@@ -597,6 +598,104 @@ public class EventService {
                     }
                 })
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void updateEventTracks(HackathonEvent event, List<TrackConfigRequest> configs) {
+        long uniqueNames = configs.stream()
+                .map(TrackConfigRequest::getName)
+                .filter(java.util.Objects::nonNull)
+                .map(name -> name.trim().toLowerCase())
+                .distinct()
+                .count();
+        if (uniqueNames != configs.size()) {
+            throw new RuntimeException("Tên các bảng đấu không được trùng nhau hoặc để trống");
+        }
+        if (configs.stream().anyMatch(config -> config.getMentorIds() == null
+                || config.getMentorIds().size() < 1 || config.getMentorIds().size() > 2)) {
+            throw new RuntimeException("Mỗi bảng đấu cần từ 1 đến 2 mentor");
+        }
+
+        List<Track> existingTracks = trackRepository.findByEventId(event.getId());
+        java.util.Set<Long> updatedTrackIds = new java.util.HashSet<>();
+
+        for (TrackConfigRequest config : configs) {
+            Track track;
+            if (config.getId() != null) {
+                track = trackRepository.findById(config.getId())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy bảng đấu để cập nhật"));
+                track.setName(config.getName().trim());
+                track.setMaxTeams(config.getMaxTeams());
+                java.util.Set<User> newMentors = resolveUsers(config.getMentorIds(), "mentor");
+                track.setMentors(newMentors);
+                trackRepository.save(track);
+                updatedTrackIds.add(track.getId());
+
+                // Sync mentors to existing qualifying round matrices for this track
+                if (Boolean.TRUE.equals(event.getStructureInitialized())) {
+                    List<TrackRoundMatrix> trackMatrices = matrixRepository.findByTrackId(track.getId());
+                    for (TrackRoundMatrix matrix : trackMatrices) {
+                        matrix.setMentors(new java.util.LinkedHashSet<>(newMentors));
+                        matrixRepository.save(matrix);
+                    }
+                }
+            } else {
+                java.util.Optional<Track> matchOpt = existingTracks.stream()
+                        .filter(t -> t.getName().trim().equalsIgnoreCase(config.getName().trim()))
+                        .findFirst();
+                if (matchOpt.isPresent()) {
+                    track = matchOpt.get();
+                    track.setMaxTeams(config.getMaxTeams());
+                    java.util.Set<User> newMentors = resolveUsers(config.getMentorIds(), "mentor");
+                    track.setMentors(newMentors);
+                    trackRepository.save(track);
+                    updatedTrackIds.add(track.getId());
+
+                    // Sync mentors to existing qualifying round matrices for this track
+                    if (Boolean.TRUE.equals(event.getStructureInitialized())) {
+                        List<TrackRoundMatrix> trackMatrices = matrixRepository.findByTrackId(track.getId());
+                        for (TrackRoundMatrix matrix : trackMatrices) {
+                            matrix.setMentors(new java.util.LinkedHashSet<>(newMentors));
+                            matrixRepository.save(matrix);
+                        }
+                    }
+                } else {
+                    Track newTrack = Track.builder()
+                            .name(config.getName().trim())
+                            .description("")
+                            .event(event)
+                            .mentors(resolveUsers(config.getMentorIds(), "mentor"))
+                            .maxTeams(config.getMaxTeams())
+                            .build();
+                    trackRepository.save(newTrack);
+
+                    // If event structure is already initialized, generate matrices for this new track!
+                    if (Boolean.TRUE.equals(event.getStructureInitialized())) {
+                        List<Round> rounds = roundRepository.findByEventIdOrderByOrderIndexAsc(event.getId());
+                        if (rounds.size() > 1) {
+                            List<Round> qualifyingRounds = rounds.subList(0, rounds.size() - 1);
+                            for (Round round : qualifyingRounds) {
+                                matrixRepository.save(TrackRoundMatrix.builder()
+                                        .track(newTrack)
+                                        .round(round)
+                                        .submissionDeadline(event.getDefaultSubmissionDeadline())
+                                        .mentors(newTrack.getMentors() == null ? new java.util.LinkedHashSet<>() : new java.util.LinkedHashSet<>(newTrack.getMentors()))
+                                        .build());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Delete tracks that are not in the new configuration
+        for (Track existing : existingTracks) {
+            if (!updatedTrackIds.contains(existing.getId())) {
+                if (teamRepository.countByTrackId(existing.getId()) > 0) {
+                    throw new RuntimeException("Không thể xóa bảng đấu " + existing.getName() + " vì đã có đội thi đăng ký vào bảng này");
+                }
+                trackRepository.delete(existing);
+            }
+        }
     }
 
     private void validateScoringCriteria(String jsonStr) {

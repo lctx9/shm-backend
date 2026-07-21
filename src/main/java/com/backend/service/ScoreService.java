@@ -52,6 +52,17 @@ public class ScoreService {
             throw new AppException(ErrorCode.JUDGE_NOT_ASSIGNED);
         }
 
+        if (submission.getFileUrl() == null || submission.getFileUrl().isBlank()) {
+            throw new RuntimeException("Đội thi chưa nộp bài giải cho vòng đấu này, không thể chấm điểm");
+        }
+
+        if (submission.getTeam() != null && "PENDING".equals(submission.getTeam().getDisqualificationStatus())) {
+            throw new RuntimeException("Đội thi này đang trong quá trình xử lý kỷ luật/chờ duyệt loại, không thể chấm điểm");
+        }
+        if (submission.getTeam() != null && "APPROVED".equals(submission.getTeam().getDisqualificationStatus())) {
+            throw new RuntimeException("Đội thi này đã bị loại khỏi giải đấu, không thể chấm điểm");
+        }
+
         if (submission.getMatrix() != null && submission.getMatrix().getSubmissionDeadline() != null) {
             if (java.time.LocalDateTime.now().isBefore(submission.getMatrix().getSubmissionDeadline())) {
                 throw new RuntimeException("Hạn nộp bài của vòng đấu này chưa kết thúc, giám khảo chưa thể chấm điểm");
