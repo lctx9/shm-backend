@@ -17,6 +17,8 @@ public class SubmissionResponse {
     private String trackName;
     private String roundName;
     private String fileUrl;
+    /** JSON của các giá trị form đã nộp theo schema của sự kiện */
+    private String submissionDataJson;
     private Boolean flagged;
     private String flagReason;
     private Double score;

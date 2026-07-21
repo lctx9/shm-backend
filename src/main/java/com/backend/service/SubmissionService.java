@@ -87,6 +87,7 @@ public class SubmissionService {
                 .team(team)
                 .matrix(matrix)
                 .fileUrl(request.getFileUrl())
+                .submissionDataJson(request.getSubmissionDataJson())
                 .isFlagged(false)
                 .isGraded(false)
                 .build();
@@ -109,11 +110,11 @@ public class SubmissionService {
                     .toList();
         }
 
+        // Trả về TẤT CẢ bài nộp của mỗi đội (tất cả các vòng) để frontend có thể tự filter theo matrixId
         for (TeamMember m : memberships) {
             submissionRepository.findByTeamId(m.getTeam().getId()).stream()
-                    .max(java.util.Comparator.comparing(Submission::getCreatedAt))
                     .map(this::toSubmissionResponse)
-                    .ifPresent(result::add);
+                    .forEach(result::add);
         }
         return result;
     }
@@ -167,6 +168,7 @@ public class SubmissionService {
 
         submission.setMatrix(matrix);
         submission.setFileUrl(request.getFileUrl());
+        submission.setSubmissionDataJson(request.getSubmissionDataJson());
         submission.setIsGraded(false);
         submission.setScore(null);
         submission.setFeedback(null);
@@ -221,6 +223,7 @@ public class SubmissionService {
                 .trackName(matrix == null ? null : (matrix.getTrack() == null ? "Chung kết" : matrix.getTrack().getName()))
                 .roundName(matrix == null ? null : matrix.getRound().getName())
                 .fileUrl(submission.getFileUrl())
+                .submissionDataJson(submission.getSubmissionDataJson())
                 .flagged(submission.isFlagged())
                 .flagReason(submission.getFlagReason())
                 .score(submission.getScore())
