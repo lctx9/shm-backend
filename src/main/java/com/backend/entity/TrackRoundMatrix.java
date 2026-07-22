@@ -30,6 +30,9 @@ public class TrackRoundMatrix extends BaseEntity {
     @Builder.Default
     private Boolean deadlineNotified = false;
 
+    @Builder.Default
+    private Boolean isPublished = false;
+
     @Column(columnDefinition = "TEXT")
     private String scoringCriteriaJson;
 

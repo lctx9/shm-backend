@@ -294,6 +294,12 @@ public class SubmissionService {
                 .disqualificationReason(team == null ? null : team.getDisqualificationReason())
                 .disqualifierEmail(team == null ? null : team.getDisqualifierEmail())
                 .rejectionReason(team == null ? null : team.getRejectionReason())
+                // Round matrix & schema fields
+                .isPublished(matrix != null && Boolean.TRUE.equals(matrix.getIsPublished()))
+                .guidelineUrl(matrix == null ? null : matrix.getGuidelineUrl())
+                .submissionDeadline(matrix == null ? null : matrix.getSubmissionDeadline())
+                .roundOrderIndex(matrix == null || matrix.getRound() == null ? null : matrix.getRound().getOrderIndex())
+                .submissionFormSchema(matrix == null || matrix.getRound() == null || matrix.getRound().getEvent() == null ? null : matrix.getRound().getEvent().getSubmissionFormSchema())
                 .build();
     }
 }

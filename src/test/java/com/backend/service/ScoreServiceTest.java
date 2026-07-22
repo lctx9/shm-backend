@@ -44,6 +44,9 @@ public class ScoreServiceTest {
     @Mock
     private TrackRoundMatrixRepository matrixRepository;
 
+    @Mock
+    private NotificationRepository notificationRepository;
+
     private ScoreService scoreService;
 
     private User judge;
@@ -118,7 +121,8 @@ public class ScoreServiceTest {
                 submissionRepository,
                 auditLogRepository,
                 userRepository,
-                matrixRepository
+                matrixRepository,
+                notificationRepository
         );
     }
 
