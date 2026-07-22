@@ -174,7 +174,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/propose-disqualify")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR') or hasRole('STAFF')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR') or hasRole('STAFF') or hasRole('JUDGE')")
     public ApiResponse<String> proposeDisqualifyTeam(@PathVariable Long teamId, @RequestBody java.util.Map<String, String> body) {
         String reason = body.get("reason");
         teamService.proposeDisqualifyTeam(teamId, reason);

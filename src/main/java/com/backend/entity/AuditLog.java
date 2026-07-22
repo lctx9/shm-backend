@@ -23,5 +23,6 @@ public class AuditLog extends BaseEntity {
     private Double oldScore;
     private Double newScore;
 
+    private String teamName;
     private String reason;
 }

@@ -87,6 +87,7 @@ public class ScoreService {
                     .judge(judge)
                     .oldScore(oldScoreValue)
                     .newScore(finalScore)
+                    .teamName(submission.getTeam() != null ? submission.getTeam().getName() : "Đội thi")
                     .reason(request.getEditReason())
                     .build();
             auditLogRepository.save(auditLog);

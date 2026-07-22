@@ -60,16 +60,23 @@ public class ChatController {
     }
 
     private void assertCanAccessTeamChat(Team team, User user) {
-        if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR) return;
+        if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR || user.getRole() == RoleType.STAFF || user.getRole() == RoleType.MENTOR) return;
 
         boolean teamMember = teamMemberRepository.findByTeamId(team.getId()).stream()
                 .anyMatch(member -> member.getUser() != null && member.getUser().getId().equals(user.getId()));
+
         boolean trackMentor = team.getTrack() != null && team.getTrack().getMentors() != null
                 && team.getTrack().getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId()));
+
         boolean assignedMentor = trackMentor || (team.getTrack() != null && matrixRepository.findByTrackId(team.getTrack().getId()).stream()
                 .anyMatch(matrix -> matrix.getMentors() != null
                         && matrix.getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId()))));
-        if (!teamMember && !assignedMentor) {
+
+        boolean eventMentor = team.getEvent() != null && matrixRepository.findByRoundEventId(team.getEvent().getId()).stream()
+                .anyMatch(matrix -> matrix.getMentors() != null
+                        && matrix.getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId())));
+
+        if (!teamMember && !assignedMentor && !eventMentor) {
             throw new RuntimeException("Bạn không phải thành viên hoặc mentor được phân công của đội này");
         }
     }

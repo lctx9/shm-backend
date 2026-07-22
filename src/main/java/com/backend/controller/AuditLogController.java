@@ -27,16 +27,25 @@ public class AuditLogController {
     }
 
     private AuditLogResponse toResponse(AuditLog log) {
-        String teamName = null;
-        if (log.getScore() != null && log.getScore().getSubmission() != null && log.getScore().getSubmission().getTeam() != null) {
+        String teamName = log.getTeamName();
+        if (teamName == null && log.getScore() != null && log.getScore().getSubmission() != null && log.getScore().getSubmission().getTeam() != null) {
             teamName = log.getScore().getSubmission().getTeam().getName();
+        }
+        if (teamName == null && log.getReason() != null) {
+            int idx = log.getReason().indexOf("loại đội \"");
+            if (idx != -1) {
+                int end = log.getReason().indexOf("\"", idx + 10);
+                if (end != -1) {
+                    teamName = log.getReason().substring(idx + 10, end);
+                }
+            }
         }
 
         return AuditLogResponse.builder()
                 .id(log.getId())
                 .judgeName(log.getJudge() == null ? null : log.getJudge().getFullName())
                 .judgeEmail(log.getJudge() == null ? null : log.getJudge().getEmail())
-                .teamName(teamName)
+                .teamName(teamName != null ? teamName : "N/A")
                 .oldScore(log.getOldScore())
                 .newScore(log.getNewScore())
                 .reason(log.getReason())
