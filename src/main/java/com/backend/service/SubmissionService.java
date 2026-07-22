@@ -174,6 +174,12 @@ public class SubmissionService {
             throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }
 
+        // Clear all previous judge scores when team leader resubmits
+        List<com.backend.entity.Score> oldScores = scoreRepository.findBySubmissionId(submission.getId());
+        if (oldScores != null && !oldScores.isEmpty()) {
+            scoreRepository.deleteAll(oldScores);
+        }
+
         submission.setMatrix(matrix);
         submission.setFileUrl(request.getFileUrl());
         submission.setSubmissionDataJson(request.getSubmissionDataJson());
