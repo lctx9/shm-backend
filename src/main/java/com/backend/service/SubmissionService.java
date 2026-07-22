@@ -46,6 +46,11 @@ public class SubmissionService {
 
         requireTeamLeader(team.getId());
 
+        long memberCount = teamMemberRepository.countByTeamId(team.getId());
+        if (memberCount < 3) {
+            throw new RuntimeException("Đội thi của bạn chưa đủ điều kiện (tối thiểu 3 thành viên chính thức) để nộp bài dự thi.");
+        }
+
         if (matrix.getTrack() != null && (team.getTrack() == null || !team.getTrack().getId().equals(matrix.getTrack().getId()))) {
             throw new AppException(ErrorCode.BUSINESS_ERROR);
         }
@@ -90,6 +95,7 @@ public class SubmissionService {
                 .team(team)
                 .matrix(matrix)
                 .fileUrl(request.getFileUrl())
+                .submissionDataJson(request.getSubmissionDataJson())
                 .isFlagged(false)
                 .isGraded(false)
                 .build();
@@ -112,6 +118,7 @@ public class SubmissionService {
                     .toList();
         }
 
+        // Trả về TẤT CẢ bài nộp của mỗi đội (tất cả các vòng) để frontend có thể tự filter theo matrixId
         for (TeamMember m : memberships) {
             submissionRepository.findByTeamId(m.getTeam().getId()).stream()
                     .map(this::toSubmissionResponse)
@@ -169,6 +176,7 @@ public class SubmissionService {
 
         submission.setMatrix(matrix);
         submission.setFileUrl(request.getFileUrl());
+        submission.setSubmissionDataJson(request.getSubmissionDataJson());
         submission.setIsGraded(false);
         submission.setScore(null);
         submission.setFeedback(null);
@@ -268,6 +276,7 @@ public class SubmissionService {
                 .trackName(matrix == null ? null : (matrix.getTrack() == null ? "Chung kết" : matrix.getTrack().getName()))
                 .roundName(matrix == null ? null : matrix.getRound().getName())
                 .fileUrl(submission.getFileUrl())
+                .submissionDataJson(submission.getSubmissionDataJson())
                 .flagged(submission.isFlagged())
                 .flagReason(submission.getFlagReason())
                 .score(scoreVal)

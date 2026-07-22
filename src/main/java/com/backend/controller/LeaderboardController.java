@@ -92,6 +92,9 @@ public class LeaderboardController {
         List<LeaderboardResponse> rows = new ArrayList<>();
 
         for (Submission submission : sortedSubmissions) {
+            if (submission.getTeam() == null || teamMemberRepository.countByTeamId(submission.getTeam().getId()) < 3) {
+                continue;
+            }
             String trackName = "Chung kết";
 
             rows.add(LeaderboardResponse.builder()

@@ -27,7 +27,7 @@ public class StatsController {
     public ApiResponse<DashboardStatsResponse> getDashboardStats() {
         // Gọi thẳng các hàm đếm (count) từ Cơ sở dữ liệu
         long activeEventsCount = eventRepository.countByIsActiveTrue();
-        long totalTeamsCount = teamRepository.count(); // Hàm count() có sẵn
+        long totalTeamsCount = teamRepository.countEligibleTeams();
         long pendingSubmissionsCount = submissionRepository.countByIsGradedFalse();
 
         DashboardStatsResponse stats = DashboardStatsResponse.builder()

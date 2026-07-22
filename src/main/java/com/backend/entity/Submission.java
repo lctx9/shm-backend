@@ -22,6 +22,11 @@ public class Submission extends BaseEntity {
 
     private String fileUrl;
 
+    /** JSON string chứa toàn bộ giá trị form theo submissionFormSchema của sự kiện.
+     *  Ví dụ: {"projectName":"SHM","repoUrl":"https://github.com/...","pitchDeck":"..."} */
+    @Column(name = "submission_data_json", columnDefinition = "TEXT")
+    private String submissionDataJson;
+
     private boolean isFlagged;
     private String flagReason;
 
