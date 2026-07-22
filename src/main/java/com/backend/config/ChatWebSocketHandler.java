@@ -170,7 +170,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     private boolean canAccessTeamChat(Team team, User user) {
-        if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR) {
+        if (user.getRole() == RoleType.ADMIN || user.getRole() == RoleType.COORDINATOR || user.getRole() == RoleType.STAFF || user.getRole() == RoleType.MENTOR) {
             return true;
         }
         boolean teamMember = teamMemberRepository.findByTeamId(team.getId()).stream()
@@ -180,7 +180,10 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         boolean assignedMentor = trackMentor || (team.getTrack() != null && matrixRepository.findByTrackId(team.getTrack().getId()).stream()
                 .anyMatch(matrix -> matrix.getMentors() != null
                         && matrix.getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId()))));
-        return teamMember || assignedMentor;
+        boolean eventMentor = team.getEvent() != null && matrixRepository.findByRoundEventId(team.getEvent().getId()).stream()
+                .anyMatch(matrix -> matrix.getMentors() != null
+                        && matrix.getMentors().stream().anyMatch(mentor -> mentor.getId().equals(user.getId())));
+        return teamMember || assignedMentor || eventMentor;
     }
 
     private ChatMessageResponse toResponse(ChatMessage message) {
