@@ -119,6 +119,65 @@ public class LeaderboardController {
                 .build();
     }
 
+    @GetMapping("/all")
+    public ApiResponse<List<LeaderboardResponse>> getAllLeaderboard() {
+        boolean showUnpublished = false;
+        org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+            String currentEmail = auth.getName();
+            Optional<User> userOpt = userRepository.findByEmail(currentEmail);
+            if (userOpt.isPresent()) {
+                RoleType role = userOpt.get().getRole();
+                if (role == RoleType.ADMIN || role == RoleType.COORDINATOR) {
+                    showUnpublished = true;
+                }
+            }
+        }
+
+        List<HackathonEvent> events = eventRepository.findAll();
+        List<LeaderboardResponse> allRows = new ArrayList<>();
+
+        for (HackathonEvent event : events) {
+            if (!Boolean.TRUE.equals(event.getResultsPublished()) && !showUnpublished) {
+                continue;
+            }
+
+            List<Submission> submissions = submissionRepository.findFinalRoundGradedSubmissions(event.getId());
+
+            for (Submission submission : submissions) {
+                allRows.add(LeaderboardResponse.builder()
+                        .id(submission.getId())
+                        .eventId(event.getId())
+                        .eventName(event.getName())
+                        .eventYear(event.getYear())
+                        .teamName(submission.getTeam() == null ? "Không rõ đội" : submission.getTeam().getName())
+                        .track("Chung kết")
+                        .projectName(submission.getFileUrl())
+                        .description(submission.getFeedback())
+                        .score(submission.getScore())
+                        .members(submission.getTeam() == null ? List.of() : teamMemberRepository.findByTeamId(submission.getTeam().getId()).stream()
+                                .map(this::toMemberResponse)
+                                .toList())
+                        .build());
+            }
+        }
+
+        allRows.sort((r1, r2) -> {
+            double score1 = r1.getScore() != null ? r1.getScore() : 0.0;
+            double score2 = r2.getScore() != null ? r2.getScore() : 0.0;
+            return Double.compare(score2, score1);
+        });
+
+        AtomicInteger rank = new AtomicInteger(1);
+        for (LeaderboardResponse row : allRows) {
+            row.setRank(rank.getAndIncrement());
+        }
+
+        return ApiResponse.<List<LeaderboardResponse>>builder()
+                .result(allRows)
+                .build();
+    }
+
     private Long getDefaultEventId() {
         List<HackathonEvent> activeEvents = eventRepository.findByIsActiveTrue();
         if (!activeEvents.isEmpty()) {
