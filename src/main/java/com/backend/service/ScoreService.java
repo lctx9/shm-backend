@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.List;
 import java.util.Comparator;
 
+import com.backend.repository.NotificationRepository;
+
 @Service
 @RequiredArgsConstructor
 public class ScoreService {
@@ -35,6 +37,7 @@ public class ScoreService {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final TrackRoundMatrixRepository matrixRepository;
+    private final NotificationRepository notificationRepository;
 
     @Transactional
     public Score gradeSubmission(ScoreRequest request) {
@@ -122,12 +125,34 @@ public class ScoreService {
         submission.setIsGraded(true);
         submissionRepository.save(submission);
 
-        promoteTopTeamsWhenRoundIsComplete(submission.getMatrix());
+        notifyCoordinatorWhenRoundIsComplete(submission.getMatrix());
 
         return savedScore;
     }
 
-    private void promoteTopTeamsWhenRoundIsComplete(TrackRoundMatrix matrix) {
+    public void notifyCoordinatorWhenRoundIsComplete(TrackRoundMatrix matrix) {
+        if (matrix == null) return;
+        List<Submission> submissions = submissionRepository.findByMatrixId(matrix.getId());
+        int requiredJudges = matrix.getJudges() == null ? 0 : matrix.getJudges().size();
+        if (submissions.isEmpty() || requiredJudges < 1) return;
+
+        boolean fullyGraded = submissions.stream()
+                .allMatch(item -> scoreRepository.findBySubmissionId(item.getId()).size() >= requiredJudges);
+        if (!fullyGraded) return;
+
+        String roundName = matrix.getRound() != null ? matrix.getRound().getName() : "Vòng đấu";
+        List<User> coordinators = userRepository.findByRole(RoleType.COORDINATOR);
+        for (User coord : coordinators) {
+            notificationRepository.save(com.backend.entity.Notification.builder()
+                    .title("Tất cả giám khảo đã chấm xong " + roundName)
+                    .body("Tất cả bài nộp tại " + roundName + " đã được các giám khảo hoàn tất chấm điểm. Vui lòng rà soát bảng xếp hạng và bấm Công bố kết quả & Mở vòng đấu tiếp theo.")
+                    .recipient(coord)
+                    .actionUrl("/events")
+                    .build());
+        }
+    }
+
+    public void promoteTopTeamsWhenRoundIsComplete(TrackRoundMatrix matrix) {
         if (matrix == null || matrix.getTopN() == null || matrix.getTopN() < 1) return;
 
         List<Submission> submissions = submissionRepository.findByMatrixId(matrix.getId());

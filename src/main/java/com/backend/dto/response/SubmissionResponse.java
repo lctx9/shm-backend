@@ -30,5 +30,12 @@ public class SubmissionResponse {
     private String disqualificationReason;
     private String disqualifierEmail;
     private String rejectionReason;
+
+    // Round matrix & Schema fields
+    private Boolean isPublished;
+    private String guidelineUrl;
+    private java.time.LocalDateTime submissionDeadline;
+    private Integer roundOrderIndex;
+    private String submissionFormSchema;
 }
 
