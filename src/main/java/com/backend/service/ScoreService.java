@@ -23,7 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.List;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.backend.repository.NotificationRepository;
 
@@ -47,6 +50,10 @@ public class ScoreService {
 
         Submission submission = submissionRepository.findById(request.getSubmissionId())
                 .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));
+
+        if (submission.getMatrix() != null && Boolean.TRUE.equals(submission.getMatrix().getIsPublished())) {
+            throw new RuntimeException("Kết quả vòng đấu đã được công bố, không thể tạo hoặc chỉnh sửa điểm");
+        }
 
         boolean assignedJudge = submission.getMatrix() != null
                 && submission.getMatrix().getJudges() != null
@@ -72,7 +79,7 @@ public class ScoreService {
             }
         }
 
-        Double finalScore = resolveScore(request);
+        Double finalScore = resolveScore(request, submission.getMatrix());
         Optional<Score> existingScoreOpt = scoreRepository.findBySubmissionIdAndJudgeId(
                 submission.getId(), judge.getId());
 
@@ -110,8 +117,15 @@ public class ScoreService {
             savedScore = scoreRepository.save(newScore);
         }
 
-        // Calculate average score of all judges for this submission
-        double avgScore = scoreRepository.findBySubmissionId(submission.getId()).stream()
+        Set<Long> assignedJudgeIds = submission.getMatrix().getJudges().stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        List<Score> assignedScores = scoreRepository.findBySubmissionId(submission.getId()).stream()
+                .filter(score -> score.getJudge() != null && assignedJudgeIds.contains(score.getJudge().getId()))
+                .toList();
+
+        // Calculate the public aggregate using only judges currently assigned to this matrix.
+        double avgScore = assignedScores.stream()
                 .map(Score::getScoreValue)
                 .filter(java.util.Objects::nonNull)
                 .mapToDouble(Double::doubleValue)
@@ -120,9 +134,16 @@ public class ScoreService {
         avgScore = Math.round(avgScore * 10.0) / 10.0;
 
         submission.setScore(avgScore);
-        submission.setCriteriaScoresJson(request.getCriteriaScoresJson());
-        submission.setFeedback(request.getComment());
-        submission.setIsGraded(true);
+        submission.setCriteriaScoresJson(assignedScores.size() == 1
+                ? assignedScores.get(0).getCriteriaScoresJson()
+                : null);
+        submission.setFeedback(aggregateFeedback(assignedScores));
+        Set<Long> judgesWhoScored = assignedScores.stream()
+                .map(Score::getJudge)
+                .filter(java.util.Objects::nonNull)
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        submission.setIsGraded(!assignedJudgeIds.isEmpty() && judgesWhoScored.containsAll(assignedJudgeIds));
         submissionRepository.save(submission);
 
         notifyCoordinatorWhenRoundIsComplete(submission.getMatrix());
@@ -131,14 +152,9 @@ public class ScoreService {
     }
 
     public void notifyCoordinatorWhenRoundIsComplete(TrackRoundMatrix matrix) {
-        if (matrix == null) return;
-        List<Submission> submissions = submissionRepository.findByMatrixId(matrix.getId());
-        int requiredJudges = matrix.getJudges() == null ? 0 : matrix.getJudges().size();
-        if (submissions.isEmpty() || requiredJudges < 1) return;
-
-        boolean fullyGraded = submissions.stream()
-                .allMatch(item -> scoreRepository.findBySubmissionId(item.getId()).size() >= requiredJudges);
-        if (!fullyGraded) return;
+        if (matrix == null || Boolean.TRUE.equals(matrix.getGradingCompletionNotified()) || !isMatrixFullyGraded(matrix)) {
+            return;
+        }
 
         String roundName = matrix.getRound() != null ? matrix.getRound().getName() : "Vòng đấu";
         List<User> coordinators = userRepository.findByRole(RoleType.COORDINATOR);
@@ -150,18 +166,17 @@ public class ScoreService {
                     .actionUrl("/events")
                     .build());
         }
+        matrix.setGradingCompletionNotified(true);
+        matrixRepository.save(matrix);
     }
 
     public void promoteTopTeamsWhenRoundIsComplete(TrackRoundMatrix matrix) {
         if (matrix == null || matrix.getTopN() == null || matrix.getTopN() < 1) return;
 
-        List<Submission> submissions = submissionRepository.findByMatrixId(matrix.getId());
-        int requiredJudges = matrix.getJudges() == null ? 0 : matrix.getJudges().size();
-        if (submissions.isEmpty() || requiredJudges < 1) return;
-
-        boolean fullyGraded = submissions.stream()
-                .allMatch(item -> scoreRepository.findBySubmissionId(item.getId()).size() >= requiredJudges);
-        if (!fullyGraded) return;
+        List<Submission> submissions = submissionRepository.findByMatrixId(matrix.getId()).stream()
+                .filter(this::isEligibleSubmission)
+                .toList();
+        if (!isMatrixFullyGraded(matrix)) return;
 
         int nextOrder = matrix.getRound().getOrderIndex() + 1;
         Long eventId = matrix.getRound().getEvent().getId();
@@ -194,6 +209,11 @@ public class ScoreService {
         List<Submission> nextRoundSubmissions = submissionRepository.findByMatrixId(nextMatrix.getId());
         for (Submission nextSub : nextRoundSubmissions) {
             Long teamId = nextSub.getTeam().getId();
+            if (matrix.getTrack() != null
+                    && nextSub.getTeam().getTrack() != null
+                    && !matrix.getTrack().getId().equals(nextSub.getTeam().getTrack().getId())) {
+                continue;
+            }
             if (!topTeamIds.contains(teamId)
                     && (nextSub.getFileUrl() == null || nextSub.getFileUrl().isBlank())
                     && !Boolean.TRUE.equals(nextSub.getIsGraded())) {
@@ -214,12 +234,143 @@ public class ScoreService {
     }
 
     private double averageScore(Submission submission) {
+        if (submission.getMatrix() == null || submission.getMatrix().getJudges() == null) {
+            return 0;
+        }
+        Set<Long> assignedJudgeIds = submission.getMatrix().getJudges().stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
         return scoreRepository.findBySubmissionId(submission.getId()).stream()
+                .filter(score -> score.getJudge() != null && assignedJudgeIds.contains(score.getJudge().getId()))
                 .map(Score::getScoreValue)
                 .filter(java.util.Objects::nonNull)
                 .mapToDouble(Double::doubleValue)
                 .average()
                 .orElse(0);
+    }
+
+    public boolean isMatrixFullyGraded(TrackRoundMatrix matrix) {
+        if (matrix == null || matrix.getJudges() == null || matrix.getJudges().isEmpty()) {
+            return false;
+        }
+        List<Submission> submissions = submissionRepository.findByMatrixId(matrix.getId()).stream()
+                .filter(this::isEligibleSubmission)
+                .toList();
+        if (submissions.isEmpty()) {
+            return false;
+        }
+
+        Set<Long> requiredJudgeIds = matrix.getJudges().stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        return submissions.stream().allMatch(item -> {
+            Set<Long> scoredJudgeIds = scoreRepository.findBySubmissionId(item.getId()).stream()
+                    .map(Score::getJudge)
+                    .filter(java.util.Objects::nonNull)
+                    .map(User::getId)
+                    .collect(Collectors.toSet());
+            return scoredJudgeIds.containsAll(requiredJudgeIds);
+        });
+    }
+
+    private boolean isEligibleSubmission(Submission submission) {
+        return submission.getFileUrl() != null
+                && !submission.getFileUrl().isBlank()
+                && (submission.getTeam() == null
+                || !"APPROVED".equals(submission.getTeam().getDisqualificationStatus()));
+    }
+
+    private String aggregateFeedback(List<Score> scores) {
+        List<Score> scoresWithComments = scores.stream()
+                .filter(score -> score.getComment() != null && !score.getComment().isBlank())
+                .toList();
+        if (scoresWithComments.size() == 1) {
+            return scoresWithComments.get(0).getComment().trim();
+        }
+        String feedback = scoresWithComments.stream()
+                .map(score -> {
+                    String judgeName = score.getJudge() == null || score.getJudge().getFullName() == null
+                            ? "Giám khảo"
+                            : score.getJudge().getFullName();
+                    return judgeName + ": " + score.getComment().trim();
+                })
+                .collect(Collectors.joining("\n\n"));
+        return feedback.isBlank() ? null : feedback;
+    }
+
+    private Double resolveScore(ScoreRequest request, TrackRoundMatrix matrix) {
+        if (matrix == null || matrix.getScoringCriteriaJson() == null
+                || matrix.getScoringCriteriaJson().isBlank()) {
+            return resolveScore(request);
+        }
+        if (request.getCriteriaScoresJson() == null || request.getCriteriaScoresJson().isBlank()) {
+            throw new AppException(ErrorCode.SCORE_REQUIRED);
+        }
+
+        try {
+            JsonNode configuredRoot = objectMapper.readTree(matrix.getScoringCriteriaJson());
+            JsonNode submittedRoot = objectMapper.readTree(request.getCriteriaScoresJson());
+            if (!configuredRoot.isArray() || configuredRoot.isEmpty() || !submittedRoot.isArray()) {
+                throw new AppException(ErrorCode.CRITERIA_SCORE_PARSE_FAILED);
+            }
+
+            Map<String, JsonNode> submittedByKey = new LinkedHashMap<>();
+            for (JsonNode submitted : submittedRoot) {
+                String key = criterionKey(submitted);
+                if (key.isBlank() || submittedByKey.putIfAbsent(key, submitted) != null) {
+                    throw new AppException(ErrorCode.CRITERIA_SCORE_PARSE_FAILED);
+                }
+            }
+
+            double weightedSum = 0;
+            double totalWeight = 0;
+            Set<String> configuredKeys = new java.util.HashSet<>();
+            for (JsonNode criterion : configuredRoot) {
+                String key = criterionKey(criterion);
+                if (key.isBlank() || !configuredKeys.add(key)) {
+                    throw new AppException(ErrorCode.CRITERIA_SCORE_PARSE_FAILED);
+                }
+                JsonNode submitted = submittedByKey.get(key);
+                if (submitted == null || !submitted.has("score")) {
+                    throw new AppException(ErrorCode.SCORE_REQUIRED);
+                }
+
+                double maxScore = criterion.path("maxScore").asDouble(0);
+                double weight = criterion.path("weight").asDouble(0);
+                double score = parseScore(submitted.get("score"));
+                if (!Double.isFinite(maxScore) || !Double.isFinite(weight) || !Double.isFinite(score)
+                        || maxScore <= 0 || weight <= 0 || score < 0 || score > maxScore) {
+                    throw new AppException(ErrorCode.INVALID_CRITERIA_SCORE);
+                }
+                weightedSum += (score / maxScore * 100.0) * weight;
+                totalWeight += weight;
+            }
+
+            if (submittedByKey.size() != configuredKeys.size() || totalWeight <= 0) {
+                throw new AppException(ErrorCode.INVALID_CRITERIA_WEIGHT);
+            }
+            return Math.round((weightedSum / totalWeight) * 10.0) / 10.0;
+        } catch (AppException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new AppException(ErrorCode.CRITERIA_SCORE_PARSE_FAILED);
+        }
+    }
+
+    private String criterionKey(JsonNode criterion) {
+        String id = criterion.path("id").asText("").trim();
+        return id.isBlank() ? criterion.path("label").asText("").trim() : id;
+    }
+
+    private double parseScore(JsonNode scoreNode) {
+        if (scoreNode == null || scoreNode.isNull()) {
+            throw new AppException(ErrorCode.SCORE_REQUIRED);
+        }
+        try {
+            return Double.parseDouble(scoreNode.asText());
+        } catch (NumberFormatException ex) {
+            throw new AppException(ErrorCode.INVALID_CRITERIA_SCORE);
+        }
     }
 
     private Double resolveScore(ScoreRequest request) {

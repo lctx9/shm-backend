@@ -407,6 +407,115 @@ public class ScoreServiceTest {
     // ─────────────────────────────────────────────────────────────────
 
     @Test
+    void gradeSubmission_ConfiguredRubric_ComputesScoreOnServer() {
+        matrix.setScoringCriteriaJson("""
+                [{"id":"technical","label":"Technical","maxScore":10,"weight":100}]
+                """);
+
+        ScoreRequest request = new ScoreRequest();
+        request.setSubmissionId(60L);
+        request.setScoreValue(100.0); // Forged client total must be ignored.
+        request.setCriteriaScoresJson("""
+                [{"id":"technical","score":"7","weight":1,"maxScore":100}]
+                """);
+
+        when(userRepository.findByEmail("judge@seal.dev")).thenReturn(Optional.of(judge));
+        when(submissionRepository.findById(60L)).thenReturn(Optional.of(submission));
+        when(scoreRepository.findBySubmissionIdAndJudgeId(60L, 1L)).thenReturn(Optional.empty());
+
+        Score[] stored = new Score[1];
+        when(scoreRepository.save(any(Score.class))).thenAnswer(invocation -> {
+            stored[0] = invocation.getArgument(0);
+            return stored[0];
+        });
+        when(scoreRepository.findBySubmissionId(60L))
+                .thenAnswer(invocation -> Collections.singletonList(stored[0]));
+
+        Score result = scoreService.gradeSubmission(request);
+
+        assertEquals(70.0, result.getScoreValue());
+        assertEquals(70.0, submission.getScore());
+    }
+
+    @Test
+    void gradeSubmission_RemainsPendingUntilEveryAssignedJudgeScores() {
+        User secondJudge = User.builder()
+                .email("judge2@seal.dev")
+                .fullName("Second Judge")
+                .role(RoleType.STAFF)
+                .build();
+        secondJudge.setId(2L);
+        matrix.setJudges(new HashSet<>(Arrays.asList(judge, secondJudge)));
+
+        ScoreRequest request = new ScoreRequest();
+        request.setSubmissionId(60L);
+        request.setScoreValue(82.0);
+
+        Score firstJudgeScore = Score.builder()
+                .submission(submission)
+                .judge(judge)
+                .scoreValue(82.0)
+                .build();
+        when(userRepository.findByEmail("judge@seal.dev")).thenReturn(Optional.of(judge));
+        when(submissionRepository.findById(60L)).thenReturn(Optional.of(submission));
+        when(scoreRepository.findBySubmissionIdAndJudgeId(60L, 1L)).thenReturn(Optional.empty());
+        when(scoreRepository.save(any(Score.class))).thenReturn(firstJudgeScore);
+        when(scoreRepository.findBySubmissionId(60L)).thenReturn(Collections.singletonList(firstJudgeScore));
+
+        scoreService.gradeSubmission(request);
+
+        assertFalse(submission.getIsGraded());
+        assertEquals(82.0, submission.getScore());
+    }
+
+    @Test
+    void gradeSubmission_Error_AfterMatrixPublished() {
+        matrix.setIsPublished(true);
+        ScoreRequest request = new ScoreRequest();
+        request.setSubmissionId(60L);
+        request.setScoreValue(85.0);
+
+        when(userRepository.findByEmail("judge@seal.dev")).thenReturn(Optional.of(judge));
+        when(submissionRepository.findById(60L)).thenReturn(Optional.of(submission));
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> scoreService.gradeSubmission(request)
+        );
+
+        assertTrue(exception.getMessage().contains("đã được công bố"));
+        verify(scoreRepository, never()).save(any());
+    }
+
+    @Test
+    void isMatrixFullyGraded_IgnoresApprovedDisqualifiedSubmission() {
+        Score completedScore = Score.builder()
+                .submission(submission)
+                .judge(judge)
+                .scoreValue(85.0)
+                .build();
+        Team disqualifiedTeam = Team.builder()
+                .name("Disqualified Team")
+                .disqualificationStatus("APPROVED")
+                .build();
+        disqualifiedTeam.setId(51L);
+        Submission disqualifiedSubmission = Submission.builder()
+                .team(disqualifiedTeam)
+                .matrix(matrix)
+                .fileUrl("http://github.com/disqualified/submission")
+                .build();
+        disqualifiedSubmission.setId(61L);
+
+        when(submissionRepository.findByMatrixId(matrix.getId()))
+                .thenReturn(List.of(submission, disqualifiedSubmission));
+        when(scoreRepository.findBySubmissionId(submission.getId()))
+                .thenReturn(List.of(completedScore));
+
+        assertTrue(scoreService.isMatrixFullyGraded(matrix));
+        verify(scoreRepository, never()).findBySubmissionId(disqualifiedSubmission.getId());
+    }
+
+    @Test
     void gradeSubmission_Promotion_WhenFullyGraded() {
         matrix.setTopN(1);
         // Setup next Round/Matrix
@@ -436,6 +545,7 @@ public class ScoreServiceTest {
         Submission subB = Submission.builder()
                 .team(teamB)
                 .matrix(matrix)
+                .fileUrl("http://github.com/team-b/submission")
                 .isGraded(true)
                 .build();
         subB.setId(61L);
@@ -464,6 +574,7 @@ public class ScoreServiceTest {
         when(submissionRepository.existsByTeamIdAndMatrixId(50L, 41L)).thenReturn(false);
 
         scoreService.gradeSubmission(request);
+        scoreService.promoteTopTeamsWhenRoundIsComplete(matrix);
 
         // Verify Team A (highest score) promoted
         verify(submissionRepository, times(1)).save(argThat(sub -> 
@@ -505,6 +616,7 @@ public class ScoreServiceTest {
         Submission subB = Submission.builder()
                 .team(teamB)
                 .matrix(matrix)
+                .fileUrl("http://github.com/team-b/submission")
                 .isGraded(true)
                 .build();
         subB.setId(61L);
@@ -532,6 +644,7 @@ public class ScoreServiceTest {
         when(submissionRepository.existsByTeamIdAndMatrixId(50L, 41L)).thenReturn(false);
 
         scoreService.gradeSubmission(request);
+        scoreService.promoteTopTeamsWhenRoundIsComplete(matrix);
 
         // Verify Team A (submitted earlier) promoted
         verify(submissionRepository, times(1)).save(argThat(sub -> 
@@ -573,6 +686,7 @@ public class ScoreServiceTest {
         Submission subB = Submission.builder()
                 .team(teamB)
                 .matrix(matrix)
+                .fileUrl("http://github.com/team-b/submission")
                 .isGraded(true)
                 .build();
         subB.setId(61L);
@@ -610,6 +724,7 @@ public class ScoreServiceTest {
         when(scoreRepository.save(any(Score.class))).thenReturn(scoreA);
 
         scoreService.gradeSubmission(request);
+        scoreService.promoteTopTeamsWhenRoundIsComplete(matrix);
 
         // Verify Team A is demoted (deleted from next matrix)
         verify(submissionRepository, times(1)).delete(nextRoundSubA);
@@ -650,6 +765,7 @@ public class ScoreServiceTest {
         Submission subB = Submission.builder()
                 .team(teamB)
                 .matrix(matrix)
+                .fileUrl("http://github.com/team-b/submission")
                 .isGraded(true)
                 .build();
         subB.setId(61L);
@@ -686,6 +802,7 @@ public class ScoreServiceTest {
         when(scoreRepository.save(any(Score.class))).thenReturn(scoreA);
 
         scoreService.gradeSubmission(request);
+        scoreService.promoteTopTeamsWhenRoundIsComplete(matrix);
 
         // Verify Team A is NOT demoted (delete is NOT called because fileUrl is present)
         verify(submissionRepository, never()).delete(nextRoundSubA);

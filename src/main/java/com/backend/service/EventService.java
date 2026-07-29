@@ -22,6 +22,7 @@ import com.backend.entity.enums.RoleType;
 import com.backend.repository.HackathonEventRepository;
 import com.backend.repository.PrizeRepository;
 import com.backend.repository.RoundRepository;
+import com.backend.repository.ScoreRepository;
 import com.backend.repository.TeamRepository;
 import com.backend.repository.TrackRepository;
 import com.backend.repository.TrackRoundMatrixRepository;
@@ -47,6 +48,7 @@ public class EventService {
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final PrizeRepository prizeRepository;
+    private final ScoreRepository scoreRepository;
     private final ObjectMapper objectMapper;
 
     private void validateEventRequest(EventRequest request) {
@@ -108,7 +110,7 @@ public class EventService {
                 .competitionRules(request.getCompetitionRules())
                 .ruleDocumentUrl(request.getRuleDocumentUrl())
                 .isActive(true)
-                .resultsPublished(request.getResultsPublished() != null ? request.getResultsPublished() : false)
+                .resultsPublished(false)
                 .build();
 
         HackathonEvent savedEvent = eventRepository.save(newEvent);
@@ -142,6 +144,16 @@ public class EventService {
             event.setActive(request.getActive());
         }
         if (request.getResultsPublished() != null) {
+            if (Boolean.TRUE.equals(request.getResultsPublished())
+                    && !Boolean.TRUE.equals(event.getResultsPublished())) {
+                List<TrackRoundMatrix> finalMatrices = matrixRepository.findByRoundEventId(eventId).stream()
+                        .filter(matrix -> matrix.getTrack() == null)
+                        .toList();
+                if (finalMatrices.isEmpty()
+                        || finalMatrices.stream().anyMatch(matrix -> !Boolean.TRUE.equals(matrix.getIsPublished()))) {
+                    throw new RuntimeException("Phải chốt kết quả vòng chung kết trước khi công bố kết quả sự kiện");
+                }
+            }
             event.setResultsPublished(request.getResultsPublished());
         }
 
@@ -269,6 +281,13 @@ public class EventService {
         TrackRoundMatrix matrix = matrixRepository.findById(matrixId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ô ma trận"));
 
+        if (Boolean.TRUE.equals(matrix.getIsPublished())) {
+            throw new RuntimeException("Vòng đấu đã được công bố, không thể thay đổi cấu hình chấm điểm");
+        }
+        if (scoreRepository.existsBySubmissionMatrixId(matrixId)) {
+            throw new RuntimeException("Vòng đấu đã phát sinh điểm. Hãy xử lý điểm hiện có trước khi thay đổi cấu hình");
+        }
+
         if (request.getJudgeIds() != null && (request.getJudgeIds().size() < 2 || request.getJudgeIds().size() > 4)) {
             throw new RuntimeException("Mỗi vòng đấu cần từ 2 đến 4 giám khảo");
         }
@@ -366,6 +385,7 @@ public class EventService {
         matrix.setSubmissionDeadline(request.getSubmissionDeadline());
         matrix.setScoringCriteriaJson(request.getScoringCriteriaJson());
         matrix.setTopN(request.getTopN());
+        matrix.setGradingCompletionNotified(false);
 
         if (request.getMentorIds() != null) {
             matrix.setMentors(resolveUsers(request.getMentorIds(), "mentor"));
@@ -490,6 +510,7 @@ public class EventService {
                 .roundName(matrix.getRound().getName())
                 .roundOrder(matrix.getRound().getOrderIndex())
                 .finalRound(matrix.getTrack() == null)
+                .isPublished(Boolean.TRUE.equals(matrix.getIsPublished()))
                 .topN(matrix.getTopN())
                 .guidelineUrl(matrix.getGuidelineUrl())
                 .submissionStartDate(matrix.getSubmissionStartDate())

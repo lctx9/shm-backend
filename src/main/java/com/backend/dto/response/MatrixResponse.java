@@ -20,6 +20,7 @@ public class MatrixResponse {
     private String roundName;
     private Integer roundOrder;
     private Boolean finalRound;
+    private Boolean isPublished;
     private Integer topN;
     private String guidelineUrl;
     private LocalDateTime submissionStartDate;
