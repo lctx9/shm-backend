@@ -52,7 +52,7 @@ public class EventController {
     }
 
     @PutMapping("/matrices/{matrixId}")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<MatrixResponse> updateMatrix(@PathVariable Long matrixId, @RequestBody MatrixUpdateRequest request) {
         return ApiResponse.<MatrixResponse>builder()
                 .result(eventService.updateMatrix(matrixId, request))
@@ -67,7 +67,7 @@ public class EventController {
     }
 
     @PostMapping("/{id}/prizes")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<PrizeResponse> createPrize(@PathVariable Long id, @RequestBody PrizeRequest request) {
         return ApiResponse.<PrizeResponse>builder()
                 .result(eventService.createPrize(id, request))
@@ -75,7 +75,7 @@ public class EventController {
     }
 
     @PutMapping("/prizes/{prizeId}")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<PrizeResponse> updatePrize(@PathVariable Long prizeId, @RequestBody PrizeRequest request) {
         return ApiResponse.<PrizeResponse>builder()
                 .result(eventService.updatePrize(prizeId, request))
@@ -83,7 +83,7 @@ public class EventController {
     }
 
     @DeleteMapping("/prizes/{prizeId}")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<String> deletePrize(@PathVariable Long prizeId) {
         eventService.deletePrize(prizeId);
         return ApiResponse.<String>builder()
@@ -92,7 +92,7 @@ public class EventController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<EventResponse> createEvent(@RequestBody EventRequest request) {
         return ApiResponse.<EventResponse>builder()
                 .result(eventService.createEvent(request))
@@ -100,7 +100,7 @@ public class EventController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<EventResponse> updateEvent(@PathVariable Long id, @RequestBody EventRequest request) {
         return ApiResponse.<EventResponse>builder()
                 .result(eventService.updateEvent(id, request))
@@ -108,7 +108,7 @@ public class EventController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<String> deleteEvent(@PathVariable Long id) {
         eventService.deleteEvent(id);
         return ApiResponse.<String>builder()
@@ -117,7 +117,7 @@ public class EventController {
     }
 
     @PostMapping("/{id}/initialize-structure")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<EventResponse> initializeStructure(@PathVariable Long id) {
         return ApiResponse.<EventResponse>builder()
                 .result(eventService.initializeStructure(id))

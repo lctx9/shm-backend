@@ -174,7 +174,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/propose-disqualify")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR') or hasRole('STAFF') or hasRole('JUDGE')")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('STAFF') or hasRole('JUDGE')")
     public ApiResponse<String> proposeDisqualifyTeam(@PathVariable Long teamId, @RequestBody java.util.Map<String, String> body) {
         String reason = body.get("reason");
         teamService.proposeDisqualifyTeam(teamId, reason);
@@ -184,7 +184,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/approve-disqualify")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<String> approveDisqualifyTeam(@PathVariable Long teamId) {
         teamService.approveDisqualifyTeam(teamId);
         return ApiResponse.<String>builder()
@@ -193,7 +193,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/reject-disqualify")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('COORDINATOR')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<String> rejectDisqualifyTeam(@PathVariable Long teamId, @RequestBody java.util.Map<String, String> body) {
         String reason = body.get("reason");
         teamService.rejectDisqualifyTeam(teamId, reason);

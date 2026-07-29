@@ -49,7 +49,7 @@ public class NotificationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<NotificationResponse> createNotification(@RequestBody NotificationRequest request) {
         User recipient = request.getRecipientId() == null ? null : userRepository.findById(request.getRecipientId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người nhận"));

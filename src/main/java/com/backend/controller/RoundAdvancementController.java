@@ -27,7 +27,7 @@ public class RoundAdvancementController {
     private final ScoreService scoreService;
 
     @PostMapping("/{matrixId}/publish-and-advance")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     @Transactional
     public ApiResponse<String> publishAndAdvanceRound(@PathVariable Long matrixId) {
         User currentUser = getCurrentUser();
@@ -46,7 +46,7 @@ public class RoundAdvancementController {
     }
 
     @PostMapping("/events/{eventId}/rounds/{roundOrder}/publish-and-advance")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     @Transactional
     public ApiResponse<String> publishAndAdvanceRound(
             @PathVariable Long eventId,
