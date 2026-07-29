@@ -11,4 +11,5 @@ import java.util.List;
 public interface ScoreRepository extends JpaRepository<Score, Long> {
     Optional<Score> findBySubmissionIdAndJudgeId(Long submissionId, Long judgeId);
     List<Score> findBySubmissionId(Long submissionId);
+    boolean existsBySubmissionMatrixId(Long matrixId);
 }

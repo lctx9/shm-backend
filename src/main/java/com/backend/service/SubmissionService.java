@@ -256,8 +256,9 @@ public class SubmissionService {
                         isGradedVal = false;
                     }
                 } 
-                // 2. If current user is a staff/judge, return their personal grading status/score
-                else if (currentUser.getRole() == RoleType.STAFF || currentUser.getRole() == RoleType.MENTOR || currentUser.getRole() == RoleType.JUDGE) {
+                // 2. If the current user is assigned as a judge, return their personal grading state.
+                else if (matrix != null && matrix.getJudges() != null
+                        && matrix.getJudges().stream().anyMatch(judge -> judge.getId().equals(currentUser.getId()))) {
                     Score personalScore = scoreRepository.findBySubmissionIdAndJudgeId(submission.getId(), currentUser.getId()).orElse(null);
                     if (personalScore != null) {
                         isGradedVal = true;

@@ -7,6 +7,7 @@ import com.backend.service.ScoreService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -27,30 +28,104 @@ public class RoundAdvancementController {
 
     @PostMapping("/{matrixId}/publish-and-advance")
     @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @Transactional
     public ApiResponse<String> publishAndAdvanceRound(@PathVariable Long matrixId) {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng hiện tại"));
-
+        User currentUser = getCurrentUser();
         TrackRoundMatrix matrix = matrixRepository.findById(matrixId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ma trận vòng đấu"));
+        if (Boolean.TRUE.equals(matrix.getIsPublished())) {
+            return ApiResponse.<String>builder()
+                    .result("Kết quả vòng đấu này đã được công bố trước đó.")
+                    .build();
+        }
 
-        // 1. Mark current matrix as published
-        matrix.setIsPublished(true);
-        matrixRepository.save(matrix);
+        validateReadyToPublish(matrix);
+        return ApiResponse.<String>builder()
+                .result(publishMatrix(matrix, currentUser))
+                .build();
+    }
 
-        // 2. Perform Top N promotion to next round matrix
+    @PostMapping("/events/{eventId}/rounds/{roundOrder}/publish-and-advance")
+    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @Transactional
+    public ApiResponse<String> publishAndAdvanceRound(
+            @PathVariable Long eventId,
+            @PathVariable Integer roundOrder) {
+        User currentUser = getCurrentUser();
+        List<TrackRoundMatrix> matrices = matrixRepository.findByRoundEventId(eventId).stream()
+                .filter(matrix -> matrix.getRound() != null
+                        && Objects.equals(matrix.getRound().getOrderIndex(), roundOrder))
+                .toList();
+        if (matrices.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy vòng đấu cần công bố");
+        }
+
+        List<TrackRoundMatrix> unpublished = matrices.stream()
+                .filter(matrix -> !Boolean.TRUE.equals(matrix.getIsPublished()))
+                .toList();
+        if (unpublished.isEmpty()) {
+            return ApiResponse.<String>builder()
+                    .result("Tất cả bảng đấu trong vòng này đã được công bố trước đó.")
+                    .build();
+        }
+
+        unpublished.forEach(this::validateReadyToPublish);
+        List<String> results = unpublished.stream()
+                .map(matrix -> publishMatrix(matrix, currentUser))
+                .toList();
+        return ApiResponse.<String>builder()
+                .result(String.join(" ", results))
+                .build();
+    }
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng hiện tại"));
+    }
+
+    private void validateReadyToPublish(TrackRoundMatrix matrix) {
+        if (matrix.getSubmissionDeadline() != null
+                && java.time.LocalDateTime.now().isBefore(matrix.getSubmissionDeadline())) {
+            throw new RuntimeException("Chưa đến hạn kết thúc nộp bài của " + matrix.getRound().getName());
+        }
+        Long eventId = matrix.getRound() == null || matrix.getRound().getEvent() == null
+                ? null
+                : matrix.getRound().getEvent().getId();
+        Integer roundOrder = matrix.getRound() == null ? null : matrix.getRound().getOrderIndex();
+        if (eventId != null && roundOrder != null) {
+            boolean hasUnpublishedPreviousRound = matrixRepository.findByRoundEventId(eventId).stream()
+                    .anyMatch(other -> other.getRound() != null
+                            && other.getRound().getOrderIndex() < roundOrder
+                            && !Boolean.TRUE.equals(other.getIsPublished()));
+            if (hasUnpublishedPreviousRound) {
+                throw new RuntimeException("Phải công bố đầy đủ các vòng trước khi công bố " + matrix.getRound().getName());
+            }
+        }
+        if (matrix.getTrack() != null && (matrix.getTopN() == null || matrix.getTopN() < 1)) {
+            throw new RuntimeException("Chưa cấu hình Top N cho " + matrix.getRound().getName()
+                    + " - " + matrix.getTrack().getName());
+        }
+        if (!scoreService.isMatrixFullyGraded(matrix)) {
+            String label = matrix.getTrack() == null
+                    ? matrix.getRound().getName()
+                    : matrix.getRound().getName() + " - " + matrix.getTrack().getName();
+            throw new RuntimeException(label + " chưa được tất cả giám khảo chấm xong");
+        }
+        if (matrix.getTrack() != null && findNextMatrix(matrix) == null) {
+            throw new RuntimeException("Chưa cấu hình vòng tiếp theo cho " + matrix.getRound().getName()
+                    + " - " + matrix.getTrack().getName());
+        }
+    }
+
+    private String publishMatrix(TrackRoundMatrix matrix, User currentUser) {
+        // Promote before locking the matrix so a failure rolls back the entire publication.
         scoreService.promoteTopTeamsWhenRoundIsComplete(matrix);
 
-        // 3. Find next round matrix if exists
-        int nextOrder = matrix.getRound() == null ? 2 : matrix.getRound().getOrderIndex() + 1;
-        Long eventId = matrix.getRound() == null ? null : matrix.getRound().getEvent().getId();
-        TrackRoundMatrix nextMatrix = (matrix.getTrack() == null || eventId == null)
-                ? null
-                : matrixRepository.findByTrackIdAndRoundOrderIndex(matrix.getTrack().getId(), nextOrder)
-                        .orElseGet(() -> matrixRepository
-                                .findByRoundEventIdAndTrackIsNullAndRoundOrderIndex(eventId, nextOrder)
-                                .orElse(null));
+        TrackRoundMatrix nextMatrix = findNextMatrix(matrix);
+
+        matrix.setIsPublished(true);
+        matrixRepository.save(matrix);
 
         Set<Long> promotedTeamIds = new HashSet<>();
         if (nextMatrix != null) {
@@ -62,11 +137,13 @@ public class RoundAdvancementController {
             }
         }
 
-        // 4. Send Notifications to Promoted & Unpromoted Teams
         String currentRoundName = matrix.getRound() != null ? matrix.getRound().getName() : "Vòng đấu";
-        String nextRoundName = (nextMatrix != null && nextMatrix.getRound() != null) ? nextMatrix.getRound().getName() : "Vòng đấu tiếp theo";
+        boolean finalRound = matrix.getTrack() == null;
+        String nextRoundName = nextMatrix != null && nextMatrix.getRound() != null
+                ? nextMatrix.getRound().getName()
+                : null;
 
-        List<Submission> currentSubmissions = submissionRepository.findByMatrixId(matrixId);
+        List<Submission> currentSubmissions = submissionRepository.findByMatrixId(matrix.getId());
         for (Submission sub : currentSubmissions) {
             Team team = sub.getTeam();
             if (team == null) continue;
@@ -77,7 +154,16 @@ public class RoundAdvancementController {
             for (TeamMember m : members) {
                 if (m.getUser() == null) continue;
 
-                if (isPromoted) {
+                if (finalRound) {
+                    notificationRepository.save(Notification.builder()
+                            .title("Kết quả " + currentRoundName + " đã được chốt")
+                            .body("Ban tổ chức đã hoàn tất chấm điểm " + currentRoundName
+                                    + ". Kết quả chung cuộc sẽ hiển thị sau khi được công bố.")
+                            .recipient(m.getUser())
+                            .sender(currentUser)
+                            .actionUrl("/my-team")
+                            .build());
+                } else if (isPromoted) {
                     String title = "🎉 Chúc mừng! Đội " + team.getName() + " đã lọt vào " + nextRoundName;
                     String body = "Chúc mừng đội " + team.getName() + " của bạn đã xuất sắc vượt qua " + currentRoundName + " và bước vào " + nextRoundName + "! Hãy nhấn vào đây để xem đề bài và nộp bài làm.";
                     notificationRepository.save(Notification.builder()
@@ -101,8 +187,12 @@ public class RoundAdvancementController {
             }
         }
 
-        // 5. Save AuditLog
-        String auditReason = "CÔNG BỐ KẾT QUẢ & MỞ VÒNG: Coordinator " + currentUser.getFullName() + " (" + currentUser.getEmail() + ") đã công bố kết quả " + currentRoundName + " và mở " + nextRoundName;
+        String auditReason = finalRound
+                ? "CHỐT KẾT QUẢ CHUNG KẾT: Coordinator " + currentUser.getFullName() + " ("
+                        + currentUser.getEmail() + ") đã chốt kết quả " + currentRoundName
+                : "CÔNG BỐ KẾT QUẢ & MỞ VÒNG: Coordinator " + currentUser.getFullName() + " ("
+                        + currentUser.getEmail() + ") đã công bố kết quả " + currentRoundName
+                        + " và mở " + nextRoundName;
         AuditLog auditLog = AuditLog.builder()
                 .judge(currentUser)
                 .teamName("Toàn bộ giải đấu")
@@ -110,8 +200,21 @@ public class RoundAdvancementController {
                 .build();
         auditLogRepository.save(auditLog);
 
-        return ApiResponse.<String>builder()
-                .result("Đã công bố kết quả " + currentRoundName + " và mở " + nextRoundName + " thành công!")
-                .build();
+        return finalRound
+                ? "Đã chốt kết quả " + currentRoundName + " thành công!"
+                : "Đã công bố kết quả " + currentRoundName + " và mở " + nextRoundName + " thành công!";
+    }
+
+    private TrackRoundMatrix findNextMatrix(TrackRoundMatrix matrix) {
+        if (matrix == null || matrix.getTrack() == null || matrix.getRound() == null
+                || matrix.getRound().getEvent() == null) {
+            return null;
+        }
+        int nextOrder = matrix.getRound().getOrderIndex() + 1;
+        Long eventId = matrix.getRound().getEvent().getId();
+        return matrixRepository.findByTrackIdAndRoundOrderIndex(matrix.getTrack().getId(), nextOrder)
+                .orElseGet(() -> matrixRepository
+                        .findByRoundEventIdAndTrackIsNullAndRoundOrderIndex(eventId, nextOrder)
+                        .orElse(null));
     }
 }
