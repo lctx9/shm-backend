@@ -47,6 +47,9 @@ public class ScoreServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private com.backend.repository.TeamMemberRepository teamMemberRepository;
+
     private ScoreService scoreService;
 
     private User judge;
@@ -122,7 +125,8 @@ public class ScoreServiceTest {
                 auditLogRepository,
                 userRepository,
                 matrixRepository,
-                notificationRepository
+                notificationRepository,
+                teamMemberRepository
         );
     }
 

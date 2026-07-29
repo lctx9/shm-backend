@@ -750,10 +750,11 @@ public class TeamService {
     @Transactional
     public void disbandTeam(Team team) {
         List<TeamMember> members = teamMemberRepository.findByTeamId(team.getId());
+        String eventName = team.getEvent() != null ? team.getEvent().getName() : "giải đấu";
         for (TeamMember member : members) {
             notificationRepository.save(Notification.builder()
-                    .title("Giải tán đội " + team.getName())
-                    .body("Đội " + team.getName() + " đã bị giải tán do không còn đủ tối thiểu 3 thành viên.")
+                    .title("⚠️ Thông báo giải tán đội " + team.getName())
+                    .body("Đội thi \"" + team.getName() + "\" của bạn bị buộc giải tán do chưa đạt tối thiểu 3 thành viên chính thức khi thời hạn đăng ký giải đấu \"" + eventName + "\" kết thúc.")
                     .recipient(member.getUser())
                     .actionUrl("/my-team")
                     .build());

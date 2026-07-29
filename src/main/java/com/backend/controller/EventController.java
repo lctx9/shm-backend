@@ -123,4 +123,12 @@ public class EventController {
                 .result(eventService.initializeStructure(id))
                 .build();
     }
+
+    @PostMapping("/{id}/end-early")
+    @PreAuthorize("hasRole('COORDINATOR')")
+    public ApiResponse<EventResponse> endEventEarly(@PathVariable Long id) {
+        return ApiResponse.<EventResponse>builder()
+                .result(eventService.endEventEarly(id))
+                .build();
+    }
 }

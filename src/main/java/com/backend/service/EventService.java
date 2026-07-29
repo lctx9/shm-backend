@@ -12,17 +12,21 @@ import com.backend.dto.response.TrackResponse;
 import com.backend.dto.response.PublicStaffResponse;
 import com.backend.dto.response.UserProfileResponse;
 import com.backend.entity.HackathonEvent;
+import com.backend.entity.Notification;
 import com.backend.entity.Prize;
 import com.backend.entity.Round;
 import com.backend.entity.Team;
+import com.backend.entity.TeamMember;
 import com.backend.entity.Track;
 import com.backend.entity.TrackRoundMatrix;
 import com.backend.entity.User;
 import com.backend.entity.enums.RoleType;
 import com.backend.repository.HackathonEventRepository;
+import com.backend.repository.NotificationRepository;
 import com.backend.repository.PrizeRepository;
 import com.backend.repository.RoundRepository;
 import com.backend.repository.ScoreRepository;
+import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TeamRepository;
 import com.backend.repository.TrackRepository;
 import com.backend.repository.TrackRoundMatrixRepository;
@@ -32,6 +36,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import java.time.Duration;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,6 +57,8 @@ public class EventService {
     private final UserRepository userRepository;
     private final PrizeRepository prizeRepository;
     private final ScoreRepository scoreRepository;
+    private final NotificationRepository notificationRepository;
+    private final TeamMemberRepository teamMemberRepository;
     private final ObjectMapper objectMapper;
 
     private void validateEventRequest(EventRequest request) {
@@ -383,6 +393,12 @@ public class EventService {
         matrix.setGuidelineUrl(request.getGuidelineUrl());
         matrix.setSubmissionStartDate(request.getSubmissionStartDate());
         matrix.setSubmissionDeadline(request.getSubmissionDeadline());
+        if (request.getGradingDurationMinutes() != null) {
+            matrix.setGradingDurationMinutes(request.getGradingDurationMinutes());
+        }
+        if (request.getBreakDurationMinutes() != null) {
+            matrix.setBreakDurationMinutes(request.getBreakDurationMinutes());
+        }
         matrix.setScoringCriteriaJson(request.getScoringCriteriaJson());
         matrix.setTopN(request.getTopN());
         matrix.setGradingCompletionNotified(false);
@@ -443,6 +459,46 @@ public class EventService {
         prizeRepository.deleteById(prizeId);
     }
 
+    @Transactional
+    public EventResponse endEventEarly(Long eventId) {
+        HackathonEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
+        event.setEndedEarly(true);
+        event.setEventEndDate(java.time.LocalDateTime.now());
+        event.setActive(false);
+        HackathonEvent savedEvent = eventRepository.save(event);
+
+        String eventName = event.getName();
+        String thankTitle = "💌 Thư cảm ơn từ Ban Tổ Chức " + eventName;
+        String thankBody = "Ban Tổ Chức xin chân thành cảm ơn bạn đã tham gia và đồng hành cùng sự kiện \"" + eventName + "\" của chúng tôi! Hẹn gặp lại bạn ở những mùa giải tiếp theo.";
+
+        Set<User> recipients = new java.util.HashSet<>();
+        List<TrackRoundMatrix> matrices = matrixRepository.findByRoundEventId(eventId);
+        for (TrackRoundMatrix m : matrices) {
+            if (m.getJudges() != null) recipients.addAll(m.getJudges());
+            if (m.getMentors() != null) recipients.addAll(m.getMentors());
+        }
+
+        List<Team> teams = teamRepository.findByEventId(eventId);
+        for (Team t : teams) {
+            List<TeamMember> members = teamMemberRepository.findByTeamId(t.getId());
+            for (TeamMember tm : members) {
+                if (tm.getUser() != null) recipients.add(tm.getUser());
+            }
+        }
+
+        for (User recipient : recipients) {
+            notificationRepository.save(Notification.builder()
+                    .title(thankTitle)
+                    .body(thankBody)
+                    .recipient(recipient)
+                    .actionUrl("/events/" + eventId)
+                    .build());
+        }
+
+        return toEventResponse(savedEvent);
+    }
+
     private EventResponse toEventResponse(HackathonEvent event) {
         List<TrackResponse> tracks = trackRepository.findByEventId(event.getId()).stream()
                 .map(this::toTrackResponse)
@@ -457,6 +513,26 @@ public class EventService {
                 .map(this::toMatrixResponse)
                 .toList();
 
+        String currentUserRole = "";
+        try {
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getAuthorities() != null) {
+                currentUserRole = auth.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .findFirst().orElse("");
+            }
+        } catch (Exception ignored) {}
+
+        boolean isCoordinatorOrAdmin = currentUserRole.contains("COORDINATOR") || currentUserRole.contains("ADMIN");
+        String formattedEndDate = null;
+        if (event.getEventEndDate() != null) {
+            if (isCoordinatorOrAdmin) {
+                formattedEndDate = event.getEventEndDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } else {
+                formattedEndDate = event.getEventEndDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            }
+        }
+
         return EventResponse.builder()
                 .id(event.getId())
                 .name(event.getName())
@@ -467,11 +543,13 @@ public class EventService {
                 .regEndDate(event.getRegEndDate())
                 .eventStartDate(event.getEventStartDate())
                 .eventEndDate(event.getEventEndDate())
+                .formattedEventEndDate(formattedEndDate)
                 .defaultSubmissionDeadline(event.getDefaultSubmissionDeadline())
                 .roundCount(event.getRoundCount())
                 .structureInitialized(Boolean.TRUE.equals(event.getStructureInitialized()) || !matrices.isEmpty())
                 .active(event.isActive())
                 .resultsPublished(Boolean.TRUE.equals(event.getResultsPublished()))
+                .endedEarly(Boolean.TRUE.equals(event.getEndedEarly()))
                 .submissionFormSchema(event.getSubmissionFormSchema())
                 .competitionRules(event.getCompetitionRules())
                 .ruleDocumentUrl(event.getRuleDocumentUrl())
@@ -502,6 +580,27 @@ public class EventService {
     }
 
     private MatrixResponse toMatrixResponse(TrackRoundMatrix matrix) {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        int gradingDuration = matrix.getGradingDurationMinutes() != null ? matrix.getGradingDurationMinutes() : 10;
+        java.time.LocalDateTime gradingDeadline = matrix.getGradingDeadline();
+        if (gradingDeadline == null && matrix.getSubmissionDeadline() != null && now.isAfter(matrix.getSubmissionDeadline())) {
+            gradingDeadline = matrix.getSubmissionDeadline().plusMinutes(gradingDuration);
+        }
+
+        Long gradingRemainingSeconds = null;
+        if (gradingDeadline != null) {
+            long sec = Duration.between(now, gradingDeadline).getSeconds();
+            gradingRemainingSeconds = sec > 0 ? sec : 0L;
+        }
+
+        int breakDuration = matrix.getBreakDurationMinutes() != null ? matrix.getBreakDurationMinutes() : 5;
+        java.time.LocalDateTime breakEndTime = matrix.getBreakEndTime();
+        Long breakRemainingSeconds = null;
+        if (breakEndTime != null) {
+            long sec = Duration.between(now, breakEndTime).getSeconds();
+            breakRemainingSeconds = sec > 0 ? sec : 0L;
+        }
+
         return MatrixResponse.builder()
                 .id(matrix.getId())
                 .trackId(matrix.getTrack() == null ? null : matrix.getTrack().getId())
@@ -509,12 +608,19 @@ public class EventService {
                 .roundId(matrix.getRound().getId())
                 .roundName(matrix.getRound().getName())
                 .roundOrder(matrix.getRound().getOrderIndex())
-                .finalRound(matrix.getTrack() == null)
+                .finalRound(matrix.getTrack() == null || (matrix.getRound() != null && matrix.getRound().getEvent() != null && java.util.Objects.equals(matrix.getRound().getOrderIndex(), matrix.getRound().getEvent().getRoundCount())))
                 .isPublished(Boolean.TRUE.equals(matrix.getIsPublished()))
                 .topN(matrix.getTopN())
                 .guidelineUrl(matrix.getGuidelineUrl())
                 .submissionStartDate(matrix.getSubmissionStartDate())
                 .submissionDeadline(matrix.getSubmissionDeadline())
+                .gradingDurationMinutes(gradingDuration)
+                .gradingDeadline(gradingDeadline)
+                .gradingRemainingSeconds(gradingRemainingSeconds)
+                .gradingExtensionNotified(Boolean.TRUE.equals(matrix.getGradingExtensionNotified()))
+                .breakDurationMinutes(breakDuration)
+                .breakEndTime(breakEndTime)
+                .breakRemainingSeconds(breakRemainingSeconds)
                 .scoringCriteriaJson(matrix.getScoringCriteriaJson())
                 .mentors(matrix.getMentors() == null ? List.of() : matrix.getMentors().stream().map(this::toPublicStaff).toList())
                 .judges(matrix.getJudges() == null ? List.of() : matrix.getJudges().stream().map(this::toPublicStaff).toList())

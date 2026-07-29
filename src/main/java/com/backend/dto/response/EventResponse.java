@@ -23,11 +23,13 @@ public class EventResponse {
     private LocalDateTime regEndDate;
     private LocalDateTime eventStartDate;
     private LocalDateTime eventEndDate;
+    private String formattedEventEndDate;
     private LocalDateTime defaultSubmissionDeadline;
     private Integer roundCount;
     private boolean structureInitialized;
     private boolean active;
     private boolean resultsPublished;
+    private Boolean endedEarly;
     private String submissionFormSchema;
     private String competitionRules;
     private String ruleDocumentUrl;

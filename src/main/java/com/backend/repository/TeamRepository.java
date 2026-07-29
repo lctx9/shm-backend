@@ -6,12 +6,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface TeamRepository extends JpaRepository<Team, Long> {
     Optional<Team> findByName(String name);
     boolean existsByName(String name);
+    List<Team> findByEventId(Long eventId);
     long countByEventId(Long eventId);
     long countByTrackId(Long trackId);
 

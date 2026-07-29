@@ -28,6 +28,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.backend.entity.Notification;
+import com.backend.entity.TeamMember;
+import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.NotificationRepository;
 
 @Service
@@ -41,6 +44,7 @@ public class ScoreService {
     private final UserRepository userRepository;
     private final TrackRoundMatrixRepository matrixRepository;
     private final NotificationRepository notificationRepository;
+    private final TeamMemberRepository teamMemberRepository;
 
     @Transactional
     public Score gradeSubmission(ScoreRequest request) {
@@ -419,6 +423,100 @@ public class ScoreService {
             throw ex;
         } catch (Exception ex) {
             throw new AppException(ErrorCode.CRITERIA_SCORE_PARSE_FAILED);
+        }
+    }
+
+    @Transactional
+    public void extendGradingTime(Long matrixId, int extraMinutes) {
+        TrackRoundMatrix matrix = matrixRepository.findById(matrixId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ma trận vòng thi"));
+
+        int added = extraMinutes <= 0 ? 5 : extraMinutes;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime base = (matrix.getGradingDeadline() != null && matrix.getGradingDeadline().isAfter(now))
+                ? matrix.getGradingDeadline()
+                : now;
+
+        matrix.setGradingDeadline(base.plusMinutes(added));
+        matrix.setGradingExtensionNotified(true);
+        matrixRepository.save(matrix);
+
+        String roundName = matrix.getRound() != null ? matrix.getRound().getName() : "Vòng thi";
+        String title = "Thời gian chấm bài đã được gia hạn";
+        String body = "Thời gian chấm bài cho " + roundName + " đã được tăng thêm " + added + " phút. Vui lòng chờ.";
+
+        if (matrix.getJudges() != null) {
+            for (User judge : matrix.getJudges()) {
+                notificationRepository.save(Notification.builder()
+                        .title(title)
+                        .body(body)
+                        .recipient(judge)
+                        .actionUrl("/dashboard/grading")
+                        .build());
+            }
+        }
+
+        List<Submission> submissions = submissionRepository.findByMatrixId(matrixId);
+        Set<User> recipients = new java.util.HashSet<>();
+        for (Submission sub : submissions) {
+            if (sub.getTeam() != null) {
+                List<TeamMember> members = teamMemberRepository.findByTeamId(sub.getTeam().getId());
+                for (TeamMember m : members) {
+                    if (m.getUser() != null) {
+                        recipients.add(m.getUser());
+                    }
+                }
+            }
+        }
+
+        for (User memberUser : recipients) {
+            notificationRepository.save(Notification.builder()
+                    .title(title)
+                    .body(body)
+                    .recipient(memberUser)
+                    .actionUrl("/my-team")
+                    .build());
+        }
+    }
+
+    @Transactional
+    public void checkAndNotifyGradingExtensionNeeded() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        List<TrackRoundMatrix> matrices = matrixRepository.findAll();
+        for (TrackRoundMatrix matrix : matrices) {
+            if (Boolean.TRUE.equals(matrix.getIsPublished())) continue;
+            if (matrix.getSubmissionDeadline() == null || now.isBefore(matrix.getSubmissionDeadline())) continue;
+
+            int duration = matrix.getGradingDurationMinutes() != null ? matrix.getGradingDurationMinutes() : 10;
+            java.time.LocalDateTime deadline = matrix.getGradingDeadline();
+            if (deadline == null) {
+                deadline = matrix.getSubmissionDeadline().plusMinutes(duration);
+                matrix.setGradingDeadline(deadline);
+                matrixRepository.save(matrix);
+            }
+
+            long remainingSec = java.time.Duration.between(now, deadline).getSeconds();
+            if (remainingSec <= 120 && remainingSec > 0 && !Boolean.TRUE.equals(matrix.getGradingExtensionNotified())) {
+                boolean isFullyGraded = isMatrixFullyGraded(matrix);
+                if (!isFullyGraded) {
+                    matrix.setGradingExtensionNotified(true);
+                    matrixRepository.save(matrix);
+
+                    List<User> coordinators = userRepository.findAll().stream()
+                            .filter(u -> u.getRole() != null && (u.getRole().name().equals("COORDINATOR") || u.getRole().name().equals("ADMIN")))
+                            .toList();
+
+                    String roundName = matrix.getRound() != null ? matrix.getRound().getName() : "Vòng thi";
+                    for (User coord : coordinators) {
+                        notificationRepository.save(Notification.builder()
+                                .title("Cảnh báo: Thời gian chấm bài còn lại dưới 2 phút")
+                                .body("Hiện tại Giám khảo chưa hoàn thành bài chấm cho " + roundName + ". Bạn có muốn xác nhận tăng thêm thời gian chấm bài không?")
+                                .recipient(coord)
+                                .actionUrl("/dashboard/grading?matrixId=" + matrix.getId() + "&extendPrompt=true")
+                                .build());
+                    }
+                }
+            }
         }
     }
 }

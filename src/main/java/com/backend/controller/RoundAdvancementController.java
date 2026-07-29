@@ -112,10 +112,20 @@ public class RoundAdvancementController {
                     : matrix.getRound().getName() + " - " + matrix.getTrack().getName();
             throw new RuntimeException(label + " chưa được tất cả giám khảo chấm xong");
         }
-        if (matrix.getTrack() != null && findNextMatrix(matrix) == null) {
+        if (!isFinalRound(matrix) && findNextMatrix(matrix) == null) {
             throw new RuntimeException("Chưa cấu hình vòng tiếp theo cho " + matrix.getRound().getName()
                     + " - " + matrix.getTrack().getName());
         }
+    }
+
+    private boolean isFinalRound(TrackRoundMatrix matrix) {
+        if (matrix == null || matrix.getRound() == null) return false;
+        if (matrix.getTrack() == null) return true;
+        HackathonEvent event = matrix.getRound().getEvent();
+        if (event != null && event.getRoundCount() != null) {
+            return Objects.equals(matrix.getRound().getOrderIndex(), event.getRoundCount());
+        }
+        return false;
     }
 
     private String publishMatrix(TrackRoundMatrix matrix, User currentUser) {
@@ -124,8 +134,16 @@ public class RoundAdvancementController {
 
         TrackRoundMatrix nextMatrix = findNextMatrix(matrix);
 
+        int breakDuration = matrix.getBreakDurationMinutes() != null ? matrix.getBreakDurationMinutes() : 5;
+        java.time.LocalDateTime breakEnd = java.time.LocalDateTime.now().plusMinutes(breakDuration);
+        matrix.setBreakEndTime(breakEnd);
         matrix.setIsPublished(true);
         matrixRepository.save(matrix);
+
+        if (nextMatrix != null) {
+            nextMatrix.setBreakEndTime(breakEnd);
+            matrixRepository.save(nextMatrix);
+        }
 
         Set<Long> promotedTeamIds = new HashSet<>();
         if (nextMatrix != null) {
@@ -138,10 +156,22 @@ public class RoundAdvancementController {
         }
 
         String currentRoundName = matrix.getRound() != null ? matrix.getRound().getName() : "Vòng đấu";
-        boolean finalRound = matrix.getTrack() == null;
+        boolean finalRound = isFinalRound(matrix);
         String nextRoundName = nextMatrix != null && nextMatrix.getRound() != null
                 ? nextMatrix.getRound().getName()
                 : null;
+
+        if (finalRound && matrix.getJudges() != null) {
+            for (User judge : matrix.getJudges()) {
+                notificationRepository.save(Notification.builder()
+                        .title("🏆 Kết quả & Bảng xếp hạng " + currentRoundName + " đã được công bố!")
+                        .body("Coordinator đã chính thức công bố điểm số và bảng xếp hạng chung cuộc của giải đấu cho " + currentRoundName + ".")
+                        .recipient(judge)
+                        .sender(currentUser)
+                        .actionUrl("/dashboard/grading")
+                        .build());
+            }
+        }
 
         List<Submission> currentSubmissions = submissionRepository.findByMatrixId(matrix.getId());
         for (Submission sub : currentSubmissions) {
@@ -156,12 +186,11 @@ public class RoundAdvancementController {
 
                 if (finalRound) {
                     notificationRepository.save(Notification.builder()
-                            .title("Kết quả " + currentRoundName + " đã được chốt")
-                            .body("Ban tổ chức đã hoàn tất chấm điểm " + currentRoundName
-                                    + ". Kết quả chung cuộc sẽ hiển thị sau khi được công bố.")
+                            .title("🏆 Kết quả & Bảng xếp hạng " + currentRoundName + " đã được công bố!")
+                            .body("Coordinator đã chính thức công bố điểm số và bảng xếp hạng chung cuộc của giải đấu cho " + currentRoundName + ". Nhấn để xem bảng xếp hạng!")
                             .recipient(m.getUser())
                             .sender(currentUser)
-                            .actionUrl("/my-team")
+                            .actionUrl("/dashboard/leaderboard")
                             .build());
                 } else if (isPromoted) {
                     String title = "🎉 Chúc mừng! Đội " + team.getName() + " đã lọt vào " + nextRoundName;

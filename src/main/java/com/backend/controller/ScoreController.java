@@ -23,4 +23,15 @@ public class ScoreController {
                 .result("Lưu điểm thành công")
                 .build();
     }
+
+    @PostMapping("/matrix/{matrixId}/extend-grading")
+    @PreAuthorize("hasRole('COORDINATOR')")
+    public ApiResponse<String> extendGradingTime(
+            @PathVariable Long matrixId,
+            @RequestParam(defaultValue = "5") int extraMinutes) {
+        scoreService.extendGradingTime(matrixId, extraMinutes);
+        return ApiResponse.<String>builder()
+                .result("Gia hạn thời gian chấm bài thành công thêm " + extraMinutes + " phút")
+                .build();
+    }
 }

@@ -44,4 +44,7 @@ public class HackathonEvent extends BaseEntity {
 
     private boolean isActive = true;
     private Boolean resultsPublished = false;
+
+    @Builder.Default
+    private Boolean endedEarly = false;
 }

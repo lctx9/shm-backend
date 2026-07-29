@@ -36,6 +36,19 @@ public class TrackRoundMatrix extends BaseEntity {
     @Builder.Default
     private Boolean gradingCompletionNotified = false;
 
+    @Builder.Default
+    private Integer gradingDurationMinutes = 10;
+
+    private LocalDateTime gradingDeadline;
+
+    @Builder.Default
+    private Boolean gradingExtensionNotified = false;
+
+    @Builder.Default
+    private Integer breakDurationMinutes = 5;
+
+    private LocalDateTime breakEndTime;
+
     @Column(columnDefinition = "TEXT")
     private String scoringCriteriaJson;
 

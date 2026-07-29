@@ -19,6 +19,14 @@ public class DeadlineNotificationScheduler {
 
     private final TrackRoundMatrixRepository matrixRepository;
     private final NotificationRepository notificationRepository;
+    private final TeamService teamService;
+
+    // Chạy mỗi 15 giây để tự động giải tán các đội chưa chính thức khi hết thời gian đăng ký
+    @Scheduled(cron = "*/15 * * * * *")
+    @Transactional
+    public void autoDisbandIncompleteTeamsOnRegDeadline() {
+        teamService.autoCleanupIncompleteTeamsForExpiredEvents();
+    }
 
     // Chạy mỗi 30 giây để kiểm tra và gửi thông báo hết hạn nộp bài cho giám khảo
     @Scheduled(cron = "*/30 * * * * *")
