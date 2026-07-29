@@ -179,7 +179,7 @@ public class TeamController {
         String reason = body.get("reason");
         teamService.proposeDisqualifyTeam(teamId, reason);
         return ApiResponse.<String>builder()
-                .result("Đã gửi đề xuất loại đội thi thành công. Đang chờ Coordinator duyệt.")
+                .result("Đã loại đội thi thành công và ghi nhận vào Audit Log.")
                 .build();
     }
 

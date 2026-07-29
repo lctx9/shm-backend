@@ -13,6 +13,7 @@ import com.backend.entity.TeamMember;
 import com.backend.entity.Track;
 import com.backend.entity.User;
 import com.backend.entity.enums.MemberRole;
+import com.backend.entity.enums.RoleType;
 import com.backend.exception.AppException;
 import com.backend.exception.ErrorCode;
 import com.backend.repository.HackathonEventRepository;
@@ -20,8 +21,6 @@ import com.backend.repository.NotificationRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TeamJoinRequestRepository;
 import com.backend.repository.TeamRepository;
-import com.backend.entity.TrackRoundMatrix;
-import com.backend.repository.TrackRoundMatrixRepository;
 import com.backend.repository.TrackRepository;
 import com.backend.repository.UserRepository;
 import com.backend.repository.SubmissionRepository;
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.HashSet;
 
 @Service
 @RequiredArgsConstructor
@@ -50,7 +48,6 @@ public class TeamService {
     private final TeamJoinRequestRepository teamJoinRequestRepository;
     private final HackathonEventRepository eventRepository;
     private final TrackRepository trackRepository;
-    private final TrackRoundMatrixRepository trackRoundMatrixRepository;
     private final NotificationRepository notificationRepository;
     private final SubmissionRepository submissionRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -854,8 +851,11 @@ public class TeamService {
         boolean isLeader = members.stream()
                 .anyMatch(m -> m.getEmail() != null && m.getEmail().equals(currentUserEmail) && m.getRole() == MemberRole.LEADER);
 
-        boolean isEligible = members.size() >= 3;
-        String statusLabel = isEligible ? "ĐỦ ĐIỀU KIỆN - ĐỘI CHÍNH THỨC" : "ĐỘI CHƯA CHÍNH THỨC (CẦN 3-5 THÀNH VIÊN)";
+        boolean isDisqualified = "APPROVED".equals(team.getDisqualificationStatus());
+        boolean isEligible = !isDisqualified && members.size() >= 3;
+        String statusLabel = isDisqualified
+                ? "ĐÃ BỊ LOẠI"
+                : isEligible ? "ĐỦ ĐIỀU KIỆN - ĐỘI CHÍNH THỨC" : "ĐỘI CHƯA CHÍNH THỨC (CẦN 3-5 THÀNH VIÊN)";
 
         return TeamResponse.builder()
                 .id(team.getId())
@@ -962,15 +962,41 @@ public class TeamService {
 
     @Transactional
     public void disqualifyTeamDirectly(Long teamId, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new RuntimeException("Lý do loại đội không được để trống");
+        }
+
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đội thi"));
+
+        if ("APPROVED".equals(team.getDisqualificationStatus())) {
+            throw new RuntimeException("Đội thi này đã bị loại trước đó");
+        }
 
         String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng hiện tại"));
 
-        // Save AuditLog for disqualification
-        String auditReason = "LOẠI ĐỘI: Giám khảo " + currentUser.getFullName() + " (" + currentUser.getEmail() + ") đã loại đội \"" + team.getName() + "\". Lý do: " + reason;
+        List<com.backend.entity.Submission> teamSubmissions = submissionRepository.findByTeamId(teamId);
+        Set<User> assignedJudges = teamSubmissions.stream()
+                .filter(submission -> submission.getMatrix() != null && submission.getMatrix().getJudges() != null)
+                .flatMap(submission -> submission.getMatrix().getJudges().stream())
+                .collect(java.util.stream.Collectors.toSet());
+
+        boolean isCoordinator = currentUser.getRole() == RoleType.COORDINATOR;
+        boolean isAssignedJudge = assignedJudges.stream()
+                .anyMatch(judge -> judge.getId().equals(currentUser.getId()));
+        if (!isCoordinator && !isAssignedJudge) {
+            throw new AppException(ErrorCode.JUDGE_NOT_ASSIGNED);
+        }
+
+        String actorRole = isCoordinator ? "Coordinator" : "Judge";
+        String actorName = currentUser.getFullName() == null || currentUser.getFullName().isBlank()
+                ? currentUser.getEmail()
+                : currentUser.getFullName();
+        String normalizedReason = reason.trim();
+        String auditReason = "LOẠI ĐỘI: " + actorRole + " " + actorName + " (" + currentUser.getEmail()
+                + ") đã loại đội \"" + team.getName() + "\". Lý do: " + normalizedReason;
         AuditLog auditLog = AuditLog.builder()
                 .judge(currentUser)
                 .score(null)
@@ -981,100 +1007,58 @@ public class TeamService {
                 .build();
         auditLogRepository.save(auditLog);
 
-        // Notify judge performing disqualification
         String eventName = team.getEvent() != null ? team.getEvent().getName() : "SEAL Hackathon";
-        String judgeBody = "Bạn đã loại đội \"" + team.getName() + "\" khỏi giải đấu " + eventName + " vì lý do: " + reason + ". Hành động của bạn đã được lưu vào Audit Log.";
+        team.setDisqualificationStatus("APPROVED");
+        team.setDisqualificationReason(normalizedReason);
+        team.setDisqualifierEmail(currentUserEmail);
+        team.setRejectionReason(null);
+        teamRepository.save(team);
+
+        String judgeBody = "Bạn đã loại đội \"" + team.getName() + "\" khỏi " + eventName
+                + ". Lý do: " + normalizedReason + ". Thao tác đã được ghi vào Audit Log.";
         notificationRepository.save(Notification.builder()
                 .title("Đã loại đội thi thành công")
                 .body(judgeBody)
                 .recipient(currentUser)
                 .sender(currentUser)
+                .actionUrl("/dashboard/grading")
                 .build());
 
-        // Notify OTHER judges assigned to the same event / matrices
-        Set<User> otherJudges = new HashSet<>();
-        List<com.backend.entity.Submission> teamSubs = submissionRepository.findByTeamId(teamId);
-        for (com.backend.entity.Submission sub : teamSubs) {
-            if (sub.getMatrix() != null && sub.getMatrix().getJudges() != null) {
-                for (User j : sub.getMatrix().getJudges()) {
-                    if (!j.getId().equals(currentUser.getId())) {
-                        otherJudges.add(j);
-                    }
-                }
+        for (User otherJudge : assignedJudges) {
+            if (otherJudge.getId().equals(currentUser.getId())) {
+                continue;
             }
-        }
-        if (team.getEvent() != null) {
-            List<TrackRoundMatrix> eventMatrices = trackRoundMatrixRepository.findByRoundEventId(team.getEvent().getId());
-            for (TrackRoundMatrix m : eventMatrices) {
-                if (m.getJudges() != null) {
-                    for (User j : m.getJudges()) {
-                        if (!j.getId().equals(currentUser.getId())) {
-                            otherJudges.add(j);
-                        }
-                    }
-                }
-            }
-        }
-
-        for (User otherJudge : otherJudges) {
-            String otherJudgeBody = "Đội \"" + team.getName() + "\" đã bị loại bởi Giám khảo " + currentUser.getFullName() + " (" + currentUser.getEmail() + ") với lý do: " + reason + ".";
+            String otherJudgeBody = "Đội \"" + team.getName() + "\" đã bị loại bởi " + actorRole + " "
+                    + actorName + " (" + currentUser.getEmail() + "). Lý do: " + normalizedReason + ".";
             notificationRepository.save(Notification.builder()
-                    .title("⚠️ Đội thi " + team.getName() + " đã bị loại")
+                    .title("Đội " + team.getName() + " đã bị loại")
                     .body(otherJudgeBody)
                     .recipient(otherJudge)
                     .sender(currentUser)
-                    .actionUrl("/submissions")
+                    .actionUrl("/dashboard/grading")
                     .build());
         }
 
-        team.setDisqualificationStatus("APPROVED");
-        team.setDisqualificationReason(reason);
-        team.setDisqualifierEmail(currentUserEmail);
-        teamRepository.save(team);
-
-        // Notify all team members with specified template format
         List<TeamMember> members = teamMemberRepository.findByTeamId(teamId);
-        for (TeamMember m : members) {
-            if (m.getUser() != null) {
-                String memberBody = "Chào " + m.getUser().getFullName() + ",\n\n"
-                    + "Đội " + team.getName() + " của bạn đã bị loại khỏi giải đấu " + eventName + " vì chúng tôi nhận thấy bạn đã vi phạm " + reason + ".\n\n"
-                    + "Mọi thắc mắc vui lòng liên hệ qua email: sealfpt@gmail.com.\n\n"
-                    + "Cảm ơn.";
+        for (TeamMember member : members) {
+            if (member.getUser() != null) {
+                String memberBody = "Đội \"" + team.getName() + "\" của bạn đã bị loại khỏi " + eventName
+                        + ". Lý do: " + normalizedReason + ". Người thực hiện: " + actorRole + " "
+                        + actorName + ".";
                 notificationRepository.save(Notification.builder()
-                        .title("⚠️ Đội thi của bạn đã bị loại khỏi giải đấu")
+                        .title("Đội của bạn đã bị loại khỏi cuộc thi")
                         .body(memberBody)
-                        .recipient(m.getUser())
+                        .recipient(member.getUser())
                         .sender(currentUser)
+                        .actionUrl("/my-team")
                         .build());
             }
         }
 
-        // Unlink prizes to avoid database constraint violations
         List<com.backend.entity.Prize> prizes = prizeRepository.findByTeamId(teamId);
         for (com.backend.entity.Prize prize : prizes) {
             prize.setTeam(null);
             prizeRepository.save(prize);
-        }
-
-        // Delete all team join requests
-        teamJoinRequestRepository.deleteAll(teamJoinRequestRepository.findByTeamId(teamId));
-
-        // Delete all chat messages
-        chatMessageRepository.deleteAll(chatMessageRepository.findByTeamIdOrderByCreatedAtAsc(teamId));
-
-        // Delete all team members
-        teamMemberRepository.deleteAll(members);
-
-        // Delete all submissions, scores, and their audit logs
-        List<com.backend.entity.Submission> submissions = submissionRepository.findByTeamId(teamId);
-        for (com.backend.entity.Submission sub : submissions) {
-            List<com.backend.entity.Score> scores = scoreRepository.findBySubmissionId(sub.getId());
-            for (com.backend.entity.Score score : scores) {
-                List<com.backend.entity.AuditLog> logs = auditLogRepository.findByScoreId(score.getId());
-                auditLogRepository.deleteAll(logs);
-            }
-            scoreRepository.deleteAll(scores);
-            submissionRepository.delete(sub);
         }
     }
 

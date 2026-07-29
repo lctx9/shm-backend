@@ -115,6 +115,16 @@ public class ScoreService {
                     .comment(request.getComment())
                     .build();
             savedScore = scoreRepository.save(newScore);
+
+            AuditLog auditLog = AuditLog.builder()
+                    .score(savedScore)
+                    .judge(judge)
+                    .oldScore(null)
+                    .newScore(finalScore)
+                    .teamName(submission.getTeam() != null ? submission.getTeam().getName() : "Đội thi")
+                    .reason("CHẤM ĐIỂM: Tạo kết quả chấm lần đầu")
+                    .build();
+            auditLogRepository.save(auditLog);
         }
 
         Set<Long> assignedJudgeIds = submission.getMatrix().getJudges().stream()
