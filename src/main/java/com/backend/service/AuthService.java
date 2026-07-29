@@ -80,22 +80,53 @@ public class AuthService {
 
         verifyRegistrationOtp(normalizedEmail, request.getOtp());
 
+        boolean isFptStudent;
+        String universityName;
+        AccountStatus status;
+
+        if (normalizedEmail.endsWith("@fpt.edu.vn")) {
+            status = AccountStatus.APPROVED;
+            if (isFptStudentEmail(normalizedEmail)) {
+                isFptStudent = true;
+                universityName = "Đại học FPT";
+            } else {
+                isFptStudent = false;
+                universityName = "Đại học FPT (Giảng viên)";
+            }
+        } else {
+            isFptStudent = request.isFptStudent();
+            universityName = request.isFptStudent() ? "Đại học FPT" : request.getUniversityName();
+            status = AccountStatus.PENDING;
+        }
+
         User newUser = User.builder()
                 .fullName(request.getFullName())
                 .email(normalizedEmail)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .studentId(request.getStudentId())
-                .isFptStudent(request.isFptStudent())
-                .universityName(request.isFptStudent() ? "Đại học FPT" : request.getUniversityName())
+                .isFptStudent(isFptStudent)
+                .universityName(universityName)
                 .studentCardUrl(request.getStudentCardUrl())
                 .role(RoleType.USER)
-                .status(AccountStatus.PENDING)
+                .status(status)
                 .build();
 
         userRepository.save(newUser);
         registrationOtps.remove(normalizedEmail);
 
-        return "Đăng ký thành công! Vui lòng chờ Coordinator phê duyệt tài khoản.";
+        return status == AccountStatus.APPROVED
+                ? "Đăng ký thành công! Tài khoản của bạn đã được tự động phê duyệt."
+                : "Đăng ký thành công! Vui lòng chờ Coordinator phê duyệt tài khoản.";
+    }
+
+    private boolean isFptStudentEmail(String email) {
+        if (email == null) return false;
+        String normalized = email.trim().toLowerCase();
+        if (!normalized.endsWith("@fpt.edu.vn")) {
+            return false;
+        }
+        String username = normalized.substring(0, normalized.indexOf("@"));
+        return username.matches("^.*[a-z]{2}\\d{6}$");
     }
 
     /**
