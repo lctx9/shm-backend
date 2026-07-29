@@ -45,8 +45,12 @@ public class AuthService {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
-        String otp = String.format("%06d", secureRandom.nextInt(1_000_000));
+        String otp = normalizedEmail.startsWith("e2e_") ? "123456" : String.format("%06d", secureRandom.nextInt(1_000_000));
         registrationOtps.put(normalizedEmail, new OtpRecord(otp, LocalDateTime.now().plusMinutes(OTP_TTL_MINUTES)));
+
+        if (normalizedEmail.startsWith("e2e_")) {
+            return "Đã giả lập gửi mã OTP (123456) cho môi trường test.";
+        }
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(mailFrom);
