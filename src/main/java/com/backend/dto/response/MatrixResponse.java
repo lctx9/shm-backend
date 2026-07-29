@@ -25,6 +25,13 @@ public class MatrixResponse {
     private String guidelineUrl;
     private LocalDateTime submissionStartDate;
     private LocalDateTime submissionDeadline;
+    private Integer gradingDurationMinutes;
+    private LocalDateTime gradingDeadline;
+    private Long gradingRemainingSeconds;
+    private Boolean gradingExtensionNotified;
+    private Integer breakDurationMinutes;
+    private LocalDateTime breakEndTime;
+    private Long breakRemainingSeconds;
     private String scoringCriteriaJson;
     private List<PublicStaffResponse> mentors;
     private List<PublicStaffResponse> judges;

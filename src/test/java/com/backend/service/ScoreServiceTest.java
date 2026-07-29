@@ -47,6 +47,9 @@ public class ScoreServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private com.backend.repository.TeamMemberRepository teamMemberRepository;
+
     private ScoreService scoreService;
 
     private User judge;
@@ -122,7 +125,8 @@ public class ScoreServiceTest {
                 auditLogRepository,
                 userRepository,
                 matrixRepository,
-                notificationRepository
+                notificationRepository,
+                teamMemberRepository
         );
     }
 
@@ -162,6 +166,14 @@ public class ScoreServiceTest {
 
         verify(scoreRepository, times(1)).save(any(Score.class));
         verify(submissionRepository, times(1)).save(submission);
+        verify(auditLogRepository).save(argThat(log ->
+                log.getScore() == savedScoreMock
+                        && log.getJudge() == judge
+                        && log.getOldScore() == null
+                        && Double.valueOf(85.5).equals(log.getNewScore())
+                        && "Team A".equals(log.getTeamName())
+                        && log.getReason().contains("Tạo kết quả chấm lần đầu")
+        ));
     }
 
     @Test

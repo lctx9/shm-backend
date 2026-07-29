@@ -46,6 +46,10 @@ public class SubmissionService {
 
         requireTeamLeader(team.getId());
 
+        if ("APPROVED".equals(team.getDisqualificationStatus())) {
+            throw new RuntimeException("Đội thi đã bị loại và không thể nộp bài");
+        }
+
         long memberCount = teamMemberRepository.countByTeamId(team.getId());
         if (memberCount < 3) {
             throw new RuntimeException("Đội thi của bạn chưa đủ điều kiện (tối thiểu 3 thành viên chính thức) để nộp bài dự thi.");
@@ -137,6 +141,10 @@ public class SubmissionService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         requireTeamLeader(submission.getTeam().getId());
+
+        if ("APPROVED".equals(submission.getTeam().getDisqualificationStatus())) {
+            throw new RuntimeException("Đội thi đã bị loại và không thể cập nhật bài nộp");
+        }
 
         if (matrix.getTrack() != null && (submission.getTeam().getTrack() == null || !submission.getTeam().getTrack().getId().equals(matrix.getTrack().getId()))) {
             throw new AppException(ErrorCode.BUSINESS_ERROR);

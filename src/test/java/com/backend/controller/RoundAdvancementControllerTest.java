@@ -196,7 +196,7 @@ class RoundAdvancementControllerTest {
         private final List<TrackRoundMatrix> promotedMatrices = new ArrayList<>();
 
         private FakeScoreService() {
-            super(new ObjectMapper(), null, null, null, null, null, null);
+            super(new ObjectMapper(), null, null, null, null, null, null, null);
         }
 
         @Override

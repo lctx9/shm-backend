@@ -10,6 +10,8 @@ public class MatrixUpdateRequest {
     private String guidelineUrl;
     private LocalDateTime submissionStartDate;
     private LocalDateTime submissionDeadline;
+    private Integer gradingDurationMinutes;
+    private Integer breakDurationMinutes;
     private String scoringCriteriaJson;
     private Set<Long> mentorIds;
     private Set<Long> judgeIds;

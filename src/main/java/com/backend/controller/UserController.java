@@ -77,11 +77,10 @@ public class UserController {
     }
 
     @PostMapping("/staff")
-    @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> createStaff(@RequestBody StaffCreateRequest request) {
-        User actor = getAuthenticatedUser();
         boolean allowed = request.getRole() == RoleType.STAFF
-                || (actor.getRole() == RoleType.ADMIN && request.getRole() == RoleType.COORDINATOR);
+                || request.getRole() == RoleType.COORDINATOR;
         if (!allowed) {
             throw new RuntimeException("Chỉ được tạo tài khoản STAFF hoặc COORDINATOR tại đây");
         }
@@ -162,7 +161,7 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> getAllUsers() {
         List<User> users = userRepository.findAll();
 
@@ -172,7 +171,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> updateStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
@@ -184,10 +183,6 @@ public class UserController {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
-
-        if (actor.getRole() == RoleType.COORDINATOR && (user.getRole() == RoleType.COORDINATOR || user.getRole() == RoleType.ADMIN)) {
-            throw new RuntimeException("Coordinator khong the thay doi trang thai cua Coordinator hoac Admin");
-        }
 
         user.setStatus(AccountStatus.valueOf(body.get("status")));
         user.setRejectionReason(body.get("reason"));

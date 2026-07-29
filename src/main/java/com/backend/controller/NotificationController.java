@@ -49,7 +49,7 @@ public class NotificationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<NotificationResponse> createNotification(@RequestBody NotificationRequest request) {
         User recipient = request.getRecipientId() == null ? null : userRepository.findById(request.getRecipientId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người nhận"));
@@ -76,9 +76,7 @@ public class NotificationController {
         if (!isVisibleTo(notification, currentUser)) {
             throw new RuntimeException("Bạn không có quyền xem thông báo này");
         }
-        if (!notificationReadRepository.existsByUserIdAndNotificationId(currentUser.getId(), id)) {
-            notificationReadRepository.save(NotificationRead.builder().notification(notification).user(currentUser).build());
-        }
+        notificationReadRepository.markAsReadIfAbsent(id, currentUser.getId());
         return ApiResponse.<String>builder().result("Đã đánh dấu là đã đọc").build();
     }
 
@@ -94,17 +92,8 @@ public class NotificationController {
             return ApiResponse.<String>builder().result("Đã đọc tất cả thông báo").build();
         }
 
-        Set<Long> readIds = notificationReadRepository
-                .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList())
-                .stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
-
-        List<NotificationRead> newReads = visible.stream()
-                .filter(item -> !readIds.contains(item.getId()))
-                .map(item -> NotificationRead.builder().notification(item).user(currentUser).build())
-                .toList();
-
-        if (!newReads.isEmpty()) {
-            notificationReadRepository.saveAll(newReads);
+        for (Notification notification : visible) {
+            notificationReadRepository.markAsReadIfAbsent(notification.getId(), currentUser.getId());
         }
         return ApiResponse.<String>builder().result("Đã đọc tất cả thông báo").build();
     }

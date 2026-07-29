@@ -22,7 +22,7 @@ public class AuditLogController {
     @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
     public ApiResponse<List<AuditLogResponse>> getAuditLogs() {
         return ApiResponse.<List<AuditLogResponse>>builder()
-                .result(auditLogRepository.findAll().stream().map(this::toResponse).toList())
+                .result(auditLogRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toResponse).toList())
                 .build();
     }
 

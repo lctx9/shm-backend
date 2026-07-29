@@ -26,7 +26,7 @@ public class RuleTemplateController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<RuleTemplateResponse> createTemplate(@RequestBody RuleTemplateRequest request) {
         return ApiResponse.<RuleTemplateResponse>builder()
                 .result(ruleTemplateService.createTemplate(request))
@@ -34,7 +34,7 @@ public class RuleTemplateController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('COORDINATOR')")
     public ApiResponse<String> deleteTemplate(@PathVariable Long id) {
         ruleTemplateService.deleteTemplate(id);
         return ApiResponse.<String>builder()
