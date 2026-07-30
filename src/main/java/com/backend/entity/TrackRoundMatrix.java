@@ -28,6 +28,9 @@ public class TrackRoundMatrix extends BaseEntity {
     private Integer topN;
 
     @Builder.Default
+    private Integer durationMinutes = 60;
+
+    @Builder.Default
     private Boolean deadlineNotified = false;
 
     @Builder.Default
