@@ -22,6 +22,7 @@ public class MatrixResponse {
     private Boolean finalRound;
     private Boolean isPublished;
     private Integer topN;
+    private Integer durationMinutes;
     private String guidelineUrl;
     private LocalDateTime submissionStartDate;
     private LocalDateTime submissionDeadline;

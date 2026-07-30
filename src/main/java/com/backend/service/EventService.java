@@ -239,10 +239,15 @@ public class EventService {
         List<Round> qualifyingRounds = rounds.subList(0, rounds.size() - 1);
         for (Track track : tracks) {
             for (Round round : qualifyingRounds) {
+                int duration = 60;
+                java.time.LocalDateTime start = round.getOrderIndex() == 1 ? event.getEventStartDate() : null;
+                java.time.LocalDateTime end = start != null ? start.plusMinutes(duration) : event.getDefaultSubmissionDeadline();
                 matrixRepository.save(TrackRoundMatrix.builder()
                         .track(track)
                         .round(round)
-                        .submissionDeadline(event.getDefaultSubmissionDeadline())
+                        .durationMinutes(duration)
+                        .submissionStartDate(start)
+                        .submissionDeadline(end)
                         .mentors(track.getMentors() == null ? new java.util.LinkedHashSet<>() : new java.util.LinkedHashSet<>(track.getMentors()))
                         .build());
             }
@@ -251,9 +256,16 @@ public class EventService {
         Set<User> finalMentors = tracks.stream()
                 .flatMap(track -> track.getMentors() == null ? java.util.stream.Stream.empty() : track.getMentors().stream())
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        Round finalRoundObj = rounds.get(rounds.size() - 1);
+        java.time.LocalDateTime finalStart = finalRoundObj.getOrderIndex() == 1 ? event.getEventStartDate() : null;
+        java.time.LocalDateTime finalEnd = finalStart != null ? finalStart.plusMinutes(60) : event.getDefaultSubmissionDeadline();
+
         matrixRepository.save(TrackRoundMatrix.builder()
-                .round(rounds.get(rounds.size() - 1))
-                .submissionDeadline(event.getDefaultSubmissionDeadline())
+                .round(finalRoundObj)
+                .durationMinutes(60)
+                .submissionStartDate(finalStart)
+                .submissionDeadline(finalEnd)
                 .mentors(finalMentors)
                 .build());
 
@@ -391,8 +403,18 @@ public class EventService {
         }
 
         matrix.setGuidelineUrl(request.getGuidelineUrl());
+        if (request.getDurationMinutes() != null && request.getDurationMinutes() > 0) {
+            matrix.setDurationMinutes(request.getDurationMinutes());
+        }
         matrix.setSubmissionStartDate(request.getSubmissionStartDate());
-        matrix.setSubmissionDeadline(request.getSubmissionDeadline());
+
+        int durationMinutes = matrix.getDurationMinutes() != null ? matrix.getDurationMinutes() : 60;
+        if (matrix.getSubmissionStartDate() != null) {
+            matrix.setSubmissionDeadline(matrix.getSubmissionStartDate().plusMinutes(durationMinutes));
+        } else if (request.getSubmissionDeadline() != null) {
+            matrix.setSubmissionDeadline(request.getSubmissionDeadline());
+        }
+
         if (request.getGradingDurationMinutes() != null) {
             matrix.setGradingDurationMinutes(request.getGradingDurationMinutes());
         }
@@ -601,6 +623,12 @@ public class EventService {
             breakRemainingSeconds = sec > 0 ? sec : 0L;
         }
 
+        int duration = matrix.getDurationMinutes() != null ? matrix.getDurationMinutes() : 60;
+        if (matrix.getSubmissionStartDate() != null && matrix.getSubmissionDeadline() != null) {
+            long diff = java.time.Duration.between(matrix.getSubmissionStartDate(), matrix.getSubmissionDeadline()).toMinutes();
+            if (diff > 0) duration = (int) diff;
+        }
+
         return MatrixResponse.builder()
                 .id(matrix.getId())
                 .trackId(matrix.getTrack() == null ? null : matrix.getTrack().getId())
@@ -608,9 +636,10 @@ public class EventService {
                 .roundId(matrix.getRound().getId())
                 .roundName(matrix.getRound().getName())
                 .roundOrder(matrix.getRound().getOrderIndex())
-                .finalRound(matrix.getTrack() == null || (matrix.getRound() != null && matrix.getRound().getEvent() != null && java.util.Objects.equals(matrix.getRound().getOrderIndex(), matrix.getRound().getEvent().getRoundCount())))
+                .finalRound(matrix.getRound() != null && matrix.getRound().getEvent() != null && java.util.Objects.equals(matrix.getRound().getOrderIndex(), matrix.getRound().getEvent().getRoundCount()))
                 .isPublished(Boolean.TRUE.equals(matrix.getIsPublished()))
                 .topN(matrix.getTopN())
+                .durationMinutes(duration)
                 .guidelineUrl(matrix.getGuidelineUrl())
                 .submissionStartDate(matrix.getSubmissionStartDate())
                 .submissionDeadline(matrix.getSubmissionDeadline())

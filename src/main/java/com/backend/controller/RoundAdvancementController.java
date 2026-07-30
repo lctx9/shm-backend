@@ -120,7 +120,6 @@ public class RoundAdvancementController {
 
     private boolean isFinalRound(TrackRoundMatrix matrix) {
         if (matrix == null || matrix.getRound() == null) return false;
-        if (matrix.getTrack() == null) return true;
         HackathonEvent event = matrix.getRound().getEvent();
         if (event != null && event.getRoundCount() != null) {
             return Objects.equals(matrix.getRound().getOrderIndex(), event.getRoundCount());
@@ -141,6 +140,10 @@ public class RoundAdvancementController {
         matrixRepository.save(matrix);
 
         if (nextMatrix != null) {
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            nextMatrix.setSubmissionStartDate(now);
+            int nextDuration = nextMatrix.getDurationMinutes() != null ? nextMatrix.getDurationMinutes() : 60;
+            nextMatrix.setSubmissionDeadline(now.plusMinutes(nextDuration));
             nextMatrix.setBreakEndTime(breakEnd);
             matrixRepository.save(nextMatrix);
         }
