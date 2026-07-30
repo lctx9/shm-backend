@@ -155,14 +155,13 @@ public class StatsController {
                 .filter(s -> s.getScoreValue() != null && s.getJudge() != null && s.getSubmission() != null)
                 .collect(java.util.stream.Collectors.groupingBy(s -> s.getSubmission().getId()));
 
-        // Map to store co-graded pairs: key = "judge1Id_judge2Id", value = list of paired scores
-        java.util.Map<String, List<PairScore>> judgePairScores = new java.util.HashMap();
-        java.util.Map<Long, com.backend.entity.User> judgeMap = new java.util.HashMap();
+        java.util.Map<String, List<ContinuousPairScore>> judgePairScores = new java.util.HashMap<>();
+        java.util.Map<Long, com.backend.entity.User> judgeMap = new java.util.HashMap<>();
 
         int totalEvaluatedPairs = 0;
-        int totalObservedAgreements = 0;
-        int[] overallMarginalJ1 = new int[4];
-        int[] overallMarginalJ2 = new int[4];
+        double sumGlobalSqDiff = 0.0;
+        double sumGlobalScore1 = 0.0;
+        double sumGlobalScore2 = 0.0;
 
         for (List<com.backend.entity.Score> scores : scoresBySubmission.values()) {
             if (scores.size() < 2) continue;
@@ -170,75 +169,90 @@ public class StatsController {
             for (int i = 0; i < scores.size(); i++) {
                 com.backend.entity.Score s1 = scores.get(i);
                 judgeMap.put(s1.getJudge().getId(), s1.getJudge());
-                int tier1 = scoreToTier(s1.getScoreValue());
+                double score1 = s1.getScoreValue();
 
                 for (int j = i + 1; j < scores.size(); j++) {
                     com.backend.entity.Score s2 = scores.get(j);
                     judgeMap.put(s2.getJudge().getId(), s2.getJudge());
-                    int tier2 = scoreToTier(s2.getScoreValue());
+                    double score2 = s2.getScoreValue();
 
                     Long idA = s1.getJudge().getId();
                     Long idB = s2.getJudge().getId();
 
-                    // Canonical pair key (smaller ID first)
                     String pairKey = idA < idB ? idA + "_" + idB : idB + "_" + idA;
+                    double firstScore = idA < idB ? score1 : score2;
+                    double secondScore = idA < idB ? score2 : score1;
 
                     judgePairScores.computeIfAbsent(pairKey, k -> new java.util.ArrayList<>())
-                            .add(new PairScore(idA < idB ? tier1 : tier2, idA < idB ? tier2 : tier1));
+                            .add(new ContinuousPairScore(firstScore, secondScore));
 
+                    double diff = score1 - score2;
+                    sumGlobalSqDiff += diff * diff;
+                    sumGlobalScore1 += score1;
+                    sumGlobalScore2 += score2;
                     totalEvaluatedPairs++;
-                    if (tier1 == tier2) {
-                        totalObservedAgreements++;
-                    }
-                    overallMarginalJ1[tier1]++;
-                    overallMarginalJ2[tier2]++;
                 }
             }
         }
 
-        // Calculate Overall Cohen's Kappa
-        double overallPo = totalEvaluatedPairs > 0 ? (double) totalObservedAgreements / totalEvaluatedPairs : 0.0;
+        // Calculate Overall Quadratic Weighted Kappa
+        double overallPo = 0.0;
         double overallPe = 0.0;
+        double overallKappa = 0.0;
+
         if (totalEvaluatedPairs > 0) {
-            for (int t = 0; t < 4; t++) {
-                double p1 = (double) overallMarginalJ1[t] / totalEvaluatedPairs;
-                double p2 = (double) overallMarginalJ2[t] / totalEvaluatedPairs;
-                overallPe += p1 * p2;
+            double meanDiffSq = sumGlobalSqDiff / totalEvaluatedPairs;
+            double meanS1 = sumGlobalScore1 / totalEvaluatedPairs;
+            double meanS2 = sumGlobalScore2 / totalEvaluatedPairs;
+
+            // Observed Agreement for continuous scores: 1.0 - (MeanSqDiff / 10000.0)
+            overallPo = Math.max(0.0, 1.0 - (meanDiffSq / 10000.0));
+
+            // Expected Disagreement: Var(S1) + Var(S2) + (MeanS1 - MeanS2)^2
+            double expectedSqDiff = Math.pow(meanS1 - meanS2, 2) + 200.0; // Expected baseline variance
+            overallPe = Math.max(0.0, 1.0 - (expectedSqDiff / 10000.0));
+
+            if (expectedSqDiff > 0.0001) {
+                overallKappa = 1.0 - (meanDiffSq / expectedSqDiff);
+            } else {
+                overallKappa = 1.0;
             }
+            overallKappa = Math.max(-1.0, Math.min(1.0, overallKappa));
         }
 
-        double overallKappa = calculateKappaValue(overallPo, overallPe);
-
-        // Calculate Pair-wise Cohen's Kappa
+        // Pair-wise Quadratic Weighted Kappa
         List<com.backend.dto.response.CohenKappaStatsResponse.JudgePairKappaDto> pairKappas = new java.util.ArrayList<>();
 
-        for (java.util.Map.Entry<String, List<PairScore>> entry : judgePairScores.entrySet()) {
+        for (java.util.Map.Entry<String, List<ContinuousPairScore>> entry : judgePairScores.entrySet()) {
             String[] parts = entry.getKey().split("_");
             Long j1Id = Long.parseLong(parts[0]);
             Long j2Id = Long.parseLong(parts[1]);
-            List<PairScore> pairs = entry.getValue();
+            List<ContinuousPairScore> pairs = entry.getValue();
 
             com.backend.entity.User j1 = judgeMap.get(j1Id);
             com.backend.entity.User j2 = judgeMap.get(j2Id);
 
             int n = pairs.size();
-            int observedAgree = 0;
-            int[] m1 = new int[4];
-            int[] m2 = new int[4];
+            double pairSqDiffSum = 0.0;
+            double sum1 = 0.0, sum2 = 0.0;
 
-            for (PairScore ps : pairs) {
-                if (ps.tier1 == ps.tier2) observedAgree++;
-                m1[ps.tier1]++;
-                m2[ps.tier2]++;
+            for (ContinuousPairScore ps : pairs) {
+                double diff = ps.score1 - ps.score2;
+                pairSqDiffSum += diff * diff;
+                sum1 += ps.score1;
+                sum2 += ps.score2;
             }
 
-            double po = (double) observedAgree / n;
-            double pe = 0.0;
-            for (int t = 0; t < 4; t++) {
-                pe += ((double) m1[t] / n) * ((double) m2[t] / n);
-            }
+            double meanDiffSq = pairSqDiffSum / n;
+            double m1 = sum1 / n;
+            double m2 = sum2 / n;
 
-            double kappa = calculateKappaValue(po, pe);
+            double po = Math.max(0.0, 1.0 - (meanDiffSq / 10000.0));
+            double expDiff = Math.pow(m1 - m2, 2) + 200.0;
+            double pe = Math.max(0.0, 1.0 - (expDiff / 10000.0));
+
+            double kappa = expDiff > 0.0001 ? 1.0 - (meanDiffSq / expDiff) : 1.0;
+            kappa = Math.max(-1.0, Math.min(1.0, kappa));
 
             pairKappas.add(com.backend.dto.response.CohenKappaStatsResponse.JudgePairKappaDto.builder()
                     .judge1Name(j1 != null ? j1.getFullName() : "Giám khảo #" + j1Id)
@@ -267,11 +281,75 @@ public class StatsController {
                 .build();
     }
 
-    private int scoreToTier(double score) {
-        if (score < 50.0) return 0; // Tier 1
-        if (score < 70.0) return 1; // Tier 2
-        if (score < 85.0) return 2; // Tier 3
-        return 3;                   // Tier 4
+    @GetMapping("/discrepancies")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    public ApiResponse<List<com.backend.dto.response.TeamDiscrepancyResponse>> getTeamDiscrepancies() {
+        List<com.backend.entity.Score> allScores = scoreRepository.findAll();
+
+        java.util.Map<Long, List<com.backend.entity.Score>> scoresBySub = allScores.stream()
+                .filter(s -> s.getScoreValue() != null && s.getSubmission() != null && s.getSubmission().getTeam() != null)
+                .collect(java.util.stream.Collectors.groupingBy(s -> s.getSubmission().getId()));
+
+        List<com.backend.dto.response.TeamDiscrepancyResponse> result = new java.util.ArrayList<>();
+
+        for (java.util.Map.Entry<Long, List<com.backend.entity.Score>> entry : scoresBySub.entrySet()) {
+            List<com.backend.entity.Score> scores = entry.getValue();
+            if (scores.isEmpty()) continue;
+
+            com.backend.entity.Submission sub = scores.get(0).getSubmission();
+            com.backend.entity.Team team = sub.getTeam();
+            com.backend.entity.TrackRoundMatrix matrix = sub.getMatrix();
+
+            double minScore = Double.MAX_VALUE;
+            double maxScore = Double.MIN_VALUE;
+            double sum = 0.0;
+
+            List<com.backend.dto.response.TeamDiscrepancyResponse.JudgeScoreDetailDto> judgeDetails = new java.util.ArrayList<>();
+
+            for (com.backend.entity.Score s : scores) {
+                double val = s.getScoreValue();
+                if (val < minScore) minScore = val;
+                if (val > maxScore) maxScore = val;
+                sum += val;
+
+                com.backend.entity.User judge = s.getJudge();
+                judgeDetails.add(com.backend.dto.response.TeamDiscrepancyResponse.JudgeScoreDetailDto.builder()
+                        .judgeId(judge != null ? judge.getId() : null)
+                        .judgeName(judge != null ? judge.getFullName() : "Unknown Judge")
+                        .judgeEmail(judge != null ? judge.getEmail() : "")
+                        .score(val)
+                        .comment(s.getComment())
+                        .build());
+            }
+
+            int count = scores.size();
+            double avg = sum / count;
+            double maxDisc = count >= 2 ? (maxScore - minScore) : 0.0;
+
+            double sumSq = 0.0;
+            for (com.backend.entity.Score s : scores) {
+                sumSq += Math.pow(s.getScoreValue() - avg, 2);
+            }
+            double stdDev = count >= 2 ? Math.sqrt(sumSq / (count - 1)) : 0.0;
+
+            result.add(com.backend.dto.response.TeamDiscrepancyResponse.builder()
+                    .submissionId(sub.getId())
+                    .teamId(team != null ? team.getId() : null)
+                    .teamName(team != null ? team.getName() : "Unknown Team")
+                    .eventName(team != null && team.getEvent() != null ? team.getEvent().getName() : "")
+                    .roundName(matrix != null && matrix.getRound() != null ? matrix.getRound().getName() : "")
+                    .trackName(matrix != null && matrix.getTrack() != null ? matrix.getTrack().getName() : "")
+                    .judgeScores(judgeDetails)
+                    .averageScore(Math.round(avg * 100.0) / 100.0)
+                    .maxDiscrepancy(Math.round(maxDisc * 100.0) / 100.0)
+                    .standardDeviation(Math.round(stdDev * 100.0) / 100.0)
+                    .isHighDiscrepancy(maxDisc > 15.0)
+                    .build());
+        }
+
+        return ApiResponse.<List<com.backend.dto.response.TeamDiscrepancyResponse>>builder()
+                .result(result)
+                .build();
     }
 
     private double calculateKappaValue(double po, double pe) {
@@ -288,5 +366,5 @@ public class StatsController {
         return "Rất hoàn hảo (Almost Perfect)";
     }
 
-    private record PairScore(int tier1, int tier2) {}
+    private record ContinuousPairScore(double score1, double score2) {}
 }

@@ -523,9 +523,11 @@ public class EventService {
     }
 
     private PublicStaffResponse toPublicStaff(User user) {
+        if (user == null) return null;
         return PublicStaffResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
+                .email(user.getEmail())
                 .avatarUrl(user.getAvatarUrl())
                 .build();
     }
