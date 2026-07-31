@@ -194,7 +194,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('COORDINATOR', 'ROLE_COORDINATOR', 'ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> updateStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
@@ -206,6 +206,11 @@ public class UserController {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
+
+        boolean coordinator = actor.getRole() == RoleType.COORDINATOR;
+        if (coordinator && user.getRole() != RoleType.USER) {
+            throw new RuntimeException("Coordinator chỉ được cập nhật trạng thái tài khoản sinh viên");
+        }
 
         user.setStatus(AccountStatus.valueOf(body.get("status")));
         user.setRejectionReason(body.get("reason"));
