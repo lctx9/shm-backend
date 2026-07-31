@@ -456,7 +456,24 @@ public class EventService {
             matrix.setJudges(resolveUsers(request.getJudgeIds(), "judge"));
         }
 
-        return toMatrixResponse(matrixRepository.save(matrix));
+        TrackRoundMatrix saved = matrixRepository.save(matrix);
+
+        // Synchronize round schedule & deadlines across all matrices of the same round
+        if (saved.getRound() != null && saved.getRound().getId() != null) {
+            List<TrackRoundMatrix> sameRound = matrixRepository.findByRoundId(saved.getRound().getId());
+            for (TrackRoundMatrix m : sameRound) {
+                if (!m.getId().equals(saved.getId())) {
+                    m.setSubmissionStartDate(saved.getSubmissionStartDate());
+                    m.setSubmissionDeadline(saved.getSubmissionDeadline());
+                    m.setDurationMinutes(saved.getDurationMinutes());
+                    m.setGradingDurationMinutes(saved.getGradingDurationMinutes());
+                    m.setBreakDurationMinutes(saved.getBreakDurationMinutes());
+                    matrixRepository.save(m);
+                }
+            }
+        }
+
+        return toMatrixResponse(saved);
     }
 
     @Transactional
