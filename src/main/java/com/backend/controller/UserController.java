@@ -102,9 +102,10 @@ public class UserController {
     @PreAuthorize("hasAnyAuthority('ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> createStaff(@RequestBody StaffCreateRequest request) {
         boolean allowed = request.getRole() == RoleType.STAFF
-                || request.getRole() == RoleType.COORDINATOR;
+                || request.getRole() == RoleType.COORDINATOR
+                || request.getRole() == RoleType.ADMIN;
         if (!allowed) {
-            throw new RuntimeException("Chỉ được tạo tài khoản STAFF hoặc COORDINATOR tại đây");
+            throw new RuntimeException("Chỉ được tạo tài khoản STAFF, COORDINATOR hoặc ADMIN tại đây");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
