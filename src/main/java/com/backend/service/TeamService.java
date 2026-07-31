@@ -541,6 +541,17 @@ public class TeamService {
         joinRequest.setStatus("APPROVED");
         teamJoinRequestRepository.save(joinRequest);
 
+        // Vô hiệu hóa vĩnh viễn các lời mời khác của cùng user trong cùng giải đấu
+        List<TeamJoinRequest> otherInvitations = teamJoinRequestRepository.findByUserIdAndTypeAndStatus(currentUser.getId(), "INVITATION", "PENDING");
+        for (TeamJoinRequest otherInv : otherInvitations) {
+            if (otherInv.getTeam() != null && otherInv.getTeam().getEvent() != null 
+                    && otherInv.getTeam().getEvent().getId().equals(event.getId())
+                    && !otherInv.getId().equals(requestId)) {
+                otherInv.setStatus("REJECTED");
+                teamJoinRequestRepository.save(otherInv);
+            }
+        }
+
         // Notify all existing team members (including leader)
         for (TeamMember existing : existingMembers) {
             notificationRepository.save(Notification.builder()
@@ -960,8 +971,75 @@ public class TeamService {
 
     @Transactional
     public void proposeDisqualifyTeam(Long teamId, String reason) {
-        disqualifyTeamDirectly(teamId, reason);
+        if (reason == null || reason.isBlank()) {
+            throw new RuntimeException("Lý do đề xuất loại đội không được để trống");
+        }
+
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đội thi"));
+
+        if ("APPROVED".equals(team.getDisqualificationStatus())) {
+            throw new RuntimeException("Đội thi này đã bị loại trước đó");
+        }
+
+        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng hiện tại"));
+
+        boolean isCoordinator = currentUser.getRole() == com.backend.entity.enums.RoleType.COORDINATOR 
+                || currentUser.getRole() == com.backend.entity.enums.RoleType.ADMIN;
+
+        if (isCoordinator) {
+            disqualifyTeamDirectly(teamId, reason);
+            return;
+        }
+
+        List<com.backend.entity.Submission> teamSubmissions = submissionRepository.findByTeamId(teamId);
+        Set<User> assignedJudges = teamSubmissions.stream()
+                .filter(submission -> submission.getMatrix() != null && submission.getMatrix().getJudges() != null)
+                .flatMap(submission -> submission.getMatrix().getJudges().stream())
+                .collect(java.util.stream.Collectors.toSet());
+
+        boolean isAssignedJudge = assignedJudges.stream()
+                .anyMatch(judge -> judge.getId().equals(currentUser.getId()));
+        if (!isAssignedJudge) {
+            throw new AppException(ErrorCode.JUDGE_NOT_ASSIGNED);
+        }
+
+        if ("PENDING".equals(team.getDisqualificationStatus())) {
+            throw new RuntimeException("Đội thi này đang có đề xuất loại đang chờ duyệt");
+        }
+
+        String normalizedReason = reason.trim();
+        team.setDisqualificationStatus("PENDING");
+        team.setDisqualificationReason(normalizedReason);
+        team.setDisqualifierEmail(currentUserEmail);
+        team.setRejectionReason(null);
+        teamRepository.save(team);
+
+        String actorName = currentUser.getFullName() == null || currentUser.getFullName().isBlank()
+                ? currentUser.getEmail()
+                : currentUser.getFullName();
+        String auditReason = "ĐỀ XUẤT LOẠI ĐỘI: Judge " + actorName + " (" + currentUser.getEmail()
+                + ") đã đề xuất loại đội \"" + team.getName() + "\". Lý do: " + normalizedReason;
+        AuditLog auditLog = AuditLog.builder()
+                .judge(currentUser)
+                .teamName(team.getName())
+                .reason(auditReason)
+                .build();
+        auditLogRepository.save(auditLog);
+
+        List<User> coordinators = userRepository.findByRole(com.backend.entity.enums.RoleType.COORDINATOR);
+        for (User coord : coordinators) {
+            notificationRepository.save(Notification.builder()
+                    .title("Đề xuất loại đội thi mới")
+                    .body(actorName + " (" + currentUser.getEmail() + ") đã đề xuất loại đội \"" + team.getName() + "\". Lý do: " + normalizedReason)
+                    .recipient(coord)
+                    .actionUrl("/dashboard/monitoring")
+                    .build());
+        }
     }
+
 
     @Transactional
     public void disqualifyTeamDirectly(Long teamId, String reason) {

@@ -92,7 +92,9 @@ public class LeaderboardController {
         List<LeaderboardResponse> rows = new ArrayList<>();
 
         for (Submission submission : sortedSubmissions) {
-            if (submission.getTeam() == null || teamMemberRepository.countByTeamId(submission.getTeam().getId()) < 3) {
+            if (submission.getTeam() == null 
+                    || "APPROVED".equals(submission.getTeam().getDisqualificationStatus())
+                    || teamMemberRepository.countByTeamId(submission.getTeam().getId()) < 3) {
                 continue;
             }
             String trackName = "Chung kết";
@@ -145,6 +147,10 @@ public class LeaderboardController {
             List<Submission> submissions = submissionRepository.findFinalRoundGradedSubmissions(event.getId());
 
             for (Submission submission : submissions) {
+                if (submission.getTeam() == null 
+                        || "APPROVED".equals(submission.getTeam().getDisqualificationStatus())) {
+                    continue;
+                }
                 allRows.add(LeaderboardResponse.builder()
                         .id(submission.getId())
                         .eventId(event.getId())
