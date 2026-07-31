@@ -36,6 +36,7 @@ public class LeaderboardController {
     private final UserRepository userRepository;
     private final HackathonEventRepository eventRepository;
     private final com.backend.repository.TrackRoundMatrixRepository matrixRepository;
+    private final com.backend.repository.PrizeRepository prizeRepository;
 
     @GetMapping
     public ApiResponse<List<LeaderboardResponse>> getLeaderboard(@RequestParam(required = false) Long eventId) {
@@ -86,6 +87,10 @@ public class LeaderboardController {
         }
 
         List<Submission> submissions = submissionRepository.findFinalRoundGradedSubmissions(targetEventId);
+        List<com.backend.entity.Prize> configuredPrizes = prizeRepository.findByEventId(targetEventId);
+        int maxLeaderboardCount = (configuredPrizes != null && !configuredPrizes.isEmpty())
+                ? configuredPrizes.size()
+                : 3;
 
         List<Submission> sortedSubmissions = submissions.stream()
                 .sorted((s1, s2) -> {
@@ -102,18 +107,28 @@ public class LeaderboardController {
                 })
                 .toList();
 
-        AtomicInteger rank = new AtomicInteger(1);
         List<LeaderboardResponse> rows = new ArrayList<>();
+        int currentRank = 1;
 
         for (Submission submission : sortedSubmissions) {
+            if (rows.size() >= maxLeaderboardCount) {
+                break;
+            }
             if (submission.getTeam() == null || teamMemberRepository.countByTeamId(submission.getTeam().getId()) < 3) {
                 continue;
             }
-            String trackName = "Chung kết";
+            String trackName = submission.getMatrix() != null && submission.getMatrix().getTrack() != null
+                    ? submission.getMatrix().getTrack().getName()
+                    : "Chung kết";
+
+            int idx = rows.size();
+            String customPrizeName = (configuredPrizes != null && idx < configuredPrizes.size())
+                    ? configuredPrizes.get(idx).getName()
+                    : null;
 
             rows.add(LeaderboardResponse.builder()
                     .id(submission.getId())
-                    .rank(rank.getAndIncrement())
+                    .rank(currentRank++)
                     .eventId(event.getId())
                     .eventName(event.getName())
                     .eventYear(event.getYear())
@@ -122,6 +137,7 @@ public class LeaderboardController {
                     .projectName(submission.getFileUrl())
                     .description(submission.getFeedback())
                     .score(submission.getScore())
+                    .prizeName(customPrizeName)
                     .members(submission.getTeam() == null ? List.of() : teamMemberRepository.findByTeamId(submission.getTeam().getId()).stream()
                             .map(this::toMemberResponse)
                             .toList())
@@ -157,18 +173,39 @@ public class LeaderboardController {
             }
 
             List<Submission> submissions = submissionRepository.findFinalRoundGradedSubmissions(event.getId());
+            List<com.backend.entity.Prize> configuredPrizes = prizeRepository.findByEventId(event.getId());
+            int maxLeaderboardCount = (configuredPrizes != null && !configuredPrizes.isEmpty())
+                    ? configuredPrizes.size()
+                    : 3;
 
-            for (Submission submission : submissions) {
+            List<Submission> sortedSubmissions = submissions.stream()
+                    .sorted((s1, s2) -> {
+                        double score1 = s1.getScore() != null ? s1.getScore() : 0.0;
+                        double score2 = s2.getScore() != null ? s2.getScore() : 0.0;
+                        return Double.compare(score2, score1);
+                    })
+                    .limit(maxLeaderboardCount)
+                    .toList();
+
+            for (int i = 0; i < sortedSubmissions.size(); i++) {
+                Submission submission = sortedSubmissions.get(i);
+                String customPrizeName = (configuredPrizes != null && i < configuredPrizes.size())
+                        ? configuredPrizes.get(i).getName()
+                        : null;
+
                 allRows.add(LeaderboardResponse.builder()
                         .id(submission.getId())
                         .eventId(event.getId())
                         .eventName(event.getName())
                         .eventYear(event.getYear())
                         .teamName(submission.getTeam() == null ? "Không rõ đội" : submission.getTeam().getName())
-                        .track("Chung kết")
+                        .track(submission.getMatrix() != null && submission.getMatrix().getTrack() != null
+                                ? submission.getMatrix().getTrack().getName()
+                                : "Chung kết")
                         .projectName(submission.getFileUrl())
                         .description(submission.getFeedback())
                         .score(submission.getScore())
+                        .prizeName(customPrizeName)
                         .members(submission.getTeam() == null ? List.of() : teamMemberRepository.findByTeamId(submission.getTeam().getId()).stream()
                                 .map(this::toMemberResponse)
                                 .toList())

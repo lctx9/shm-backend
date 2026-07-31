@@ -20,5 +20,6 @@ public class LeaderboardResponse {
     private String projectName;
     private String description;
     private Double score;
+    private String prizeName;
     private java.util.List<TeamMemberResponse> members;
 }
