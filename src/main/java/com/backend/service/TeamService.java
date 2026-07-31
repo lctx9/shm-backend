@@ -124,8 +124,9 @@ public class TeamService {
 
         java.util.List<User> invitedUsers = new java.util.ArrayList<>();
         for (String email : uniqueEmails) {
-            User user = userRepository.findByEmail(email)
-                    .orElse(null);
+            String targetEmail = email != null ? email.trim().toLowerCase() : "";
+            User user = userRepository.findByEmail(targetEmail)
+                    .orElseGet(() -> userRepository.findByEmail(email).orElse(null));
             if (user == null || user.getStatus() != com.backend.entity.enums.AccountStatus.APPROVED) {
                 throw new RuntimeException("Không tìm thấy thành viên với email: " + email);
             }
@@ -317,8 +318,10 @@ public class TeamService {
             throw new RuntimeException("Chỉ Team Leader của đội mới được mời thành viên");
         }
 
-        User invitedUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy email thành viên"));
+        String targetEmail = email != null ? email.trim().toLowerCase() : "";
+        User invitedUser = userRepository.findByEmail(targetEmail)
+                .orElseGet(() -> userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy email thành viên")));
 
         if (invitedUser.getRole() == com.backend.entity.enums.RoleType.ADMIN ||
             invitedUser.getRole() == com.backend.entity.enums.RoleType.COORDINATOR ||
