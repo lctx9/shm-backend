@@ -400,6 +400,16 @@ public class TeamService {
         teamMemberRepository.save(currentLeader);
         teamMemberRepository.save(nextLeader);
 
+        if (nextLeader.getUser() != null) {
+            notificationRepository.save(Notification.builder()
+                    .title("👑 Bạn đã trở thành Trưởng nhóm")
+                    .body("Bạn đã được chuyển quyền Trưởng nhóm của đội \"" + currentLeader.getTeam().getName() + "\".")
+                    .recipient(nextLeader.getUser())
+                    .sender(currentLeader.getUser())
+                    .actionUrl("/my-team")
+                    .build());
+        }
+
         return toTeamResponse(currentLeader.getTeam());
     }
 
