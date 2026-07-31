@@ -39,4 +39,6 @@ public class Team extends BaseEntity {
     private String disqualifierEmail;
 
     private String rejectionReason;
+
+    private String skillsNeeded;
 }
