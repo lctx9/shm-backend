@@ -77,6 +77,10 @@ public class SubmissionService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
+        if (currentOrder > 1 && matrix.getBreakEndTime() != null && now.isBefore(matrix.getBreakEndTime())) {
+            throw new RuntimeException("Submissions and updates are disabled during the inter-round break. Please wait until the break ends.");
+        }
+
         if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
             throw new AppException(ErrorCode.SUBMISSION_NOT_STARTED);
         }
@@ -169,6 +173,10 @@ public class SubmissionService {
                     }
                 }
             }
+        }
+
+        if (currentOrder > 1 && matrix.getBreakEndTime() != null && now.isBefore(matrix.getBreakEndTime())) {
+            throw new RuntimeException("Submissions and updates are disabled during the inter-round break. Please wait until the break ends.");
         }
 
         if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
