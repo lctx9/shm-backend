@@ -39,10 +39,13 @@ public class NotificationController {
         if (visible.isEmpty()) {
             return ApiResponse.<List<NotificationResponse>>builder().result(List.of()).build();
         }
-        Set<Long> readIds = notificationReadRepository
-                .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList())
-                .stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
+        List<NotificationRead> states = notificationReadRepository
+                .findByUserIdAndNotificationIdIn(currentUser.getId(), visible.stream().map(Notification::getId).toList());
+        Set<Long> dismissedIds = states.stream().filter(item -> Boolean.TRUE.equals(item.getDismissed()))
+                .map(item -> item.getNotification().getId()).collect(Collectors.toSet());
+        Set<Long> readIds = states.stream().map(item -> item.getNotification().getId()).collect(Collectors.toSet());
         List<NotificationResponse> rows = visible.stream()
+                .filter(item -> !dismissedIds.contains(item.getId()))
                 .map(item -> toResponse(item, readIds.contains(item.getId())))
                 .toList();
         return ApiResponse.<List<NotificationResponse>>builder().result(rows).build();
@@ -109,14 +112,7 @@ public class NotificationController {
             throw new RuntimeException("Bạn không có quyền xóa thông báo này");
         }
 
-        List<NotificationRead> reads = notificationReadRepository.findAll().stream()
-                .filter(r -> r.getNotification() != null && r.getNotification().getId().equals(id))
-                .toList();
-        if (!reads.isEmpty()) {
-            notificationReadRepository.deleteAll(reads);
-        }
-
-        notificationRepository.delete(notification);
+        dismissForUser(notification, currentUser);
         return ApiResponse.<String>builder().result("Đã xóa thông báo").build();
     }
 
@@ -136,16 +132,7 @@ public class NotificationController {
             return ApiResponse.<String>builder().result("Đã xóa tất cả thông báo").build();
         }
 
-        List<Long> visibleIds = visible.stream().map(Notification::getId).toList();
-
-        List<NotificationRead> reads = notificationReadRepository.findAll().stream()
-                .filter(r -> r.getNotification() != null && visibleIds.contains(r.getNotification().getId()))
-                .toList();
-        if (!reads.isEmpty()) {
-            notificationReadRepository.deleteAll(reads);
-        }
-
-        notificationRepository.deleteAll(visible);
+        visible.forEach(notification -> dismissForUser(notification, currentUser));
 
         return ApiResponse.<String>builder().result("Đã xóa tất cả thông báo khỏi hộp thư của bạn").build();
     }
@@ -153,6 +140,14 @@ public class NotificationController {
     private User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
+    }
+
+    private void dismissForUser(Notification notification, User user) {
+        NotificationRead state = notificationReadRepository
+                .findByUserIdAndNotificationId(user.getId(), notification.getId())
+                .orElseGet(() -> NotificationRead.builder().notification(notification).user(user).build());
+        state.setDismissed(true);
+        notificationReadRepository.save(state);
     }
 
     private NotificationResponse toResponse(Notification notification, boolean read) {

@@ -11,6 +11,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     List<Submission> findByTeamId(Long teamId);
     List<Submission> findByMatrixId(Long matrixId);
     boolean existsByTeamIdAndMatrixId(Long teamId, Long matrixId);
+    boolean existsByMatrixId(Long matrixId);
     @org.springframework.data.jpa.repository.Query("SELECT s FROM Submission s WHERE s.isGraded = true " +
             "AND s.matrix.round.event.id = :eventId " +
             "AND s.matrix.track IS NULL")

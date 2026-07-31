@@ -4,6 +4,8 @@ import com.backend.dto.request.EventRequest;
 import com.backend.dto.request.TrackConfigRequest;
 import com.backend.dto.request.MatrixUpdateRequest;
 import com.backend.dto.request.PrizeRequest;
+import com.backend.dto.request.CompetitionSetupRequest;
+import com.backend.dto.request.MatrixBatchUpdateRequest;
 import com.backend.dto.response.EventResponse;
 import com.backend.dto.response.MatrixResponse;
 import com.backend.dto.response.PrizeResponse;
@@ -26,6 +28,7 @@ import com.backend.repository.NotificationRepository;
 import com.backend.repository.PrizeRepository;
 import com.backend.repository.RoundRepository;
 import com.backend.repository.ScoreRepository;
+import com.backend.repository.SubmissionRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TeamRepository;
 import com.backend.repository.TrackRepository;
@@ -57,6 +60,7 @@ public class EventService {
     private final UserRepository userRepository;
     private final PrizeRepository prizeRepository;
     private final ScoreRepository scoreRepository;
+    private final SubmissionRepository submissionRepository;
     private final NotificationRepository notificationRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final ObjectMapper objectMapper;
@@ -131,11 +135,30 @@ public class EventService {
     }
 
     @Transactional
+    public EventResponse createCompetition(CompetitionSetupRequest request) {
+        if (request == null || request.getEvent() == null) {
+            throw new RuntimeException("Event configuration is required");
+        }
+        EventResponse created = createEvent(request.getEvent());
+        if (request.getPrizes() != null) {
+            request.getPrizes().stream()
+                    .filter(prize -> prize.getName() != null && !prize.getName().isBlank())
+                    .forEach(prize -> createPrize(created.getId(), prize));
+        }
+        return initializeStructure(created.getId());
+    }
+
+    @Transactional
     public EventResponse updateEvent(Long eventId, EventRequest request) {
         validateEventRequest(request);
 
         HackathonEvent event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
+
+        if ((Boolean.TRUE.equals(event.getStructureInitialized()) || matrixRepository.countByRoundEventId(eventId) > 0)
+                && !java.util.Objects.equals(event.getRoundCount(), request.getRoundCount())) {
+            throw new RuntimeException("Cannot change round count after the competition structure is initialized");
+        }
 
         event.setName(request.getName());
         event.setDescription(request.getDescription());
@@ -434,6 +457,16 @@ public class EventService {
         }
 
         return toMatrixResponse(matrixRepository.save(matrix));
+    }
+
+    @Transactional
+    public List<MatrixResponse> updateMatrices(MatrixBatchUpdateRequest request) {
+        if (request == null || request.getUpdates() == null || request.getUpdates().isEmpty()) {
+            throw new RuntimeException("At least one matrix update is required");
+        }
+        return request.getUpdates().stream()
+                .map(item -> updateMatrix(item.getMatrixId(), item.getConfig()))
+                .toList();
     }
 
     public List<PrizeResponse> getPrizes(Long eventId) {
@@ -779,6 +812,9 @@ public class EventService {
             if (config.getId() != null) {
                 track = trackRepository.findById(config.getId())
                         .orElseThrow(() -> new RuntimeException("Không tìm thấy bảng đấu để cập nhật"));
+                if (track.getEvent() == null || !track.getEvent().getId().equals(event.getId())) {
+                    throw new RuntimeException("Track does not belong to this event");
+                }
                 track.setName(config.getName().trim());
                 track.setMaxTeams(config.getMaxTeams());
                 java.util.Set<User> newMentors = resolveUsers(config.getMentorIds(), "mentor");
@@ -849,6 +885,11 @@ public class EventService {
                 if (teamRepository.countByTrackId(existing.getId()) > 0) {
                     throw new RuntimeException("Không thể xóa bảng đấu " + existing.getName() + " vì đã có đội thi đăng ký vào bảng này");
                 }
+                List<TrackRoundMatrix> matrices = matrixRepository.findByTrackId(existing.getId());
+                if (matrices.stream().anyMatch(matrix -> submissionRepository.existsByMatrixId(matrix.getId()))) {
+                    throw new RuntimeException("Cannot delete a track that already has submissions");
+                }
+                matrixRepository.deleteAll(matrices);
                 trackRepository.delete(existing);
             }
         }

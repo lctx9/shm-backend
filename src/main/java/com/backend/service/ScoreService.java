@@ -83,6 +83,28 @@ public class ScoreService {
             }
         }
 
+        TrackRoundMatrix gradingMatrix = submission.getMatrix();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        if (gradingMatrix == null || gradingMatrix.getSubmissionDeadline() == null) {
+            throw new RuntimeException("The submission deadline is not configured");
+        }
+        java.time.LocalDateTime gradingDeadline = gradingMatrix.getGradingDeadline();
+        if (gradingDeadline == null) {
+            int duration = gradingMatrix.getGradingDurationMinutes() == null
+                    ? 10 : gradingMatrix.getGradingDurationMinutes();
+            gradingDeadline = gradingMatrix.getSubmissionDeadline().plusMinutes(duration);
+        }
+        if (now.isAfter(gradingDeadline)) {
+            throw new RuntimeException("The grading deadline has passed");
+        }
+        if (gradingMatrix.getRound() != null && gradingMatrix.getRound().getEvent() != null) {
+            com.backend.entity.HackathonEvent event = gradingMatrix.getRound().getEvent();
+            if (Boolean.TRUE.equals(event.getEndedEarly())
+                    || (event.getEventEndDate() != null && now.isAfter(event.getEventEndDate()))) {
+                throw new RuntimeException("The event has ended");
+            }
+        }
+
         Double finalScore = resolveScore(request, submission.getMatrix());
         Optional<Score> existingScoreOpt = scoreRepository.findBySubmissionIdAndJudgeId(
                 submission.getId(), judge.getId());

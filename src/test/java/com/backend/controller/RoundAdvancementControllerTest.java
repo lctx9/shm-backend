@@ -12,6 +12,7 @@ import com.backend.repository.SubmissionRepository;
 import com.backend.repository.TeamMemberRepository;
 import com.backend.repository.TrackRoundMatrixRepository;
 import com.backend.repository.UserRepository;
+import com.backend.repository.HackathonEventRepository;
 import com.backend.service.ScoreService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,8 @@ class RoundAdvancementControllerTest {
     private AuditLogRepository auditLogRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private HackathonEventRepository eventRepository;
     private FakeScoreService scoreService;
 
     private RoundAdvancementController controller;
@@ -69,6 +72,7 @@ class RoundAdvancementControllerTest {
                 notificationRepository,
                 auditLogRepository,
                 userRepository,
+                eventRepository,
                 scoreService
         );
         coordinator = User.builder()
@@ -157,7 +161,7 @@ class RoundAdvancementControllerTest {
         assertTrue(response.getResult().contains("Track A") || response.getResult().contains("Vòng 1"));
         assertTrue(scoreService.promotedMatrices.contains(matrixA));
         assertTrue(scoreService.promotedMatrices.contains(matrixB));
-        verify(matrixRepository, times(2)).save(any(TrackRoundMatrix.class));
+        verify(matrixRepository, times(4)).save(any(TrackRoundMatrix.class));
         verify(auditLogRepository, times(2)).save(any());
     }
 

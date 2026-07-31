@@ -3,6 +3,8 @@ package com.backend.controller;
 import com.backend.dto.request.EventRequest;
 import com.backend.dto.request.MatrixUpdateRequest;
 import com.backend.dto.request.PrizeRequest;
+import com.backend.dto.request.CompetitionSetupRequest;
+import com.backend.dto.request.MatrixBatchUpdateRequest;
 import com.backend.dto.response.ApiResponse;
 import com.backend.dto.response.EventResponse;
 import com.backend.dto.response.MatrixResponse;
@@ -59,6 +61,14 @@ public class EventController {
                 .build();
     }
 
+    @PutMapping("/matrices/batch")
+    @PreAuthorize("hasRole('COORDINATOR')")
+    public ApiResponse<List<MatrixResponse>> updateMatrices(@RequestBody MatrixBatchUpdateRequest request) {
+        return ApiResponse.<List<MatrixResponse>>builder()
+                .result(eventService.updateMatrices(request))
+                .build();
+    }
+
     @GetMapping("/{id}/prizes")
     public ApiResponse<List<PrizeResponse>> getPrizes(@PathVariable Long id) {
         return ApiResponse.<List<PrizeResponse>>builder()
@@ -96,6 +106,14 @@ public class EventController {
     public ApiResponse<EventResponse> createEvent(@RequestBody EventRequest request) {
         return ApiResponse.<EventResponse>builder()
                 .result(eventService.createEvent(request))
+                .build();
+    }
+
+    @PostMapping("/setup")
+    @PreAuthorize("hasRole('COORDINATOR')")
+    public ApiResponse<EventResponse> createCompetition(@RequestBody CompetitionSetupRequest request) {
+        return ApiResponse.<EventResponse>builder()
+                .result(eventService.createCompetition(request))
                 .build();
     }
 

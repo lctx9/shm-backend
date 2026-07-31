@@ -42,7 +42,6 @@ public class SecurityConfig {
                                 "/api/upload/**",
                                 "/uploads/**",
                                 "/api/leaderboard/**",
-                                "/api/stats/**",
                                 "/api/events/**",
                                 "/api/rule-templates/**",
                                 "/v3/api-docs/**",

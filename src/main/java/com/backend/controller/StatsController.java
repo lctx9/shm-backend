@@ -25,6 +25,7 @@ public class StatsController {
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('COORDINATOR', 'ADMIN', 'STAFF', 'JUDGE')")
     public ApiResponse<DashboardStatsResponse> getDashboardStats() {
         // Gọi thẳng các hàm đếm (count) từ Cơ sở dữ liệu
         long activeEventsCount = eventRepository.countByIsActiveTrue();
@@ -349,4 +350,4 @@ public class StatsController {
     }
 
     private record PairScore(int tier1, int tier2) {}
-}
+}

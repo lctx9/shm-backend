@@ -24,6 +24,7 @@ public class RoundAdvancementController {
     private final NotificationRepository notificationRepository;
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+    private final HackathonEventRepository eventRepository;
     private final ScoreService scoreService;
 
     @PostMapping("/{matrixId}/publish-and-advance")
@@ -120,6 +121,7 @@ public class RoundAdvancementController {
 
     private boolean isFinalRound(TrackRoundMatrix matrix) {
         if (matrix == null || matrix.getRound() == null) return false;
+        if (matrix.getTrack() == null) return true;
         HackathonEvent event = matrix.getRound().getEvent();
         if (event != null && event.getRoundCount() != null) {
             return Objects.equals(matrix.getRound().getOrderIndex(), event.getRoundCount());
@@ -138,6 +140,12 @@ public class RoundAdvancementController {
         matrix.setBreakEndTime(breakEnd);
         matrix.setIsPublished(true);
         matrixRepository.save(matrix);
+
+        if (isFinalRound(matrix) && matrix.getRound() != null && matrix.getRound().getEvent() != null) {
+            HackathonEvent event = matrix.getRound().getEvent();
+            event.setResultsPublished(true);
+            eventRepository.save(event);
+        }
 
         if (nextMatrix != null) {
             java.time.LocalDateTime now = java.time.LocalDateTime.now();

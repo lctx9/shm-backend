@@ -98,6 +98,7 @@ public class ScoreServiceTest {
                 .round(round)
                 .track(track)
                 .submissionDeadline(LocalDateTime.now().minusDays(1)) // past deadline
+                .gradingDeadline(LocalDateTime.now().plusDays(1))
                 .judges(new HashSet<>(Collections.singletonList(judge)))
                 .topN(2)
                 .build();

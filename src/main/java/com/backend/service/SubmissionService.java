@@ -45,6 +45,7 @@ public class SubmissionService {
                 .orElseThrow(() -> new AppException(ErrorCode.MATRIX_NOT_FOUND));
 
         requireTeamLeader(team.getId());
+        requireSameEvent(team, matrix);
 
         if ("APPROVED".equals(team.getDisqualificationStatus())) {
             throw new RuntimeException("Đội thi đã bị loại và không thể nộp bài");
@@ -71,21 +72,9 @@ public class SubmissionService {
 
         int currentOrder = matrix.getRound().getOrderIndex();
         if (currentOrder > 1) {
-            List<TrackRoundMatrix> allEventMatrices = matrixRepository.findByRoundEventId(matrix.getRound().getEvent().getId());
-            for (TrackRoundMatrix other : allEventMatrices) {
-                if (other.getRound().getOrderIndex() == currentOrder - 1) {
-                    boolean isPreceding = false;
-                    if (matrix.getTrack() == null) {
-                        isPreceding = true;
-                    } else if (other.getTrack() != null && other.getTrack().getId().equals(matrix.getTrack().getId())) {
-                        isPreceding = true;
-                    }
-
-                    if (isPreceding && other.getSubmissionDeadline() != null && now.isBefore(other.getSubmissionDeadline())) {
-                        throw new AppException(ErrorCode.PREVIOUS_ROUND_NOT_ENDED);
-                    }
-                }
-            }
+            // Later-round rows are created only by the server-side Top-N promotion flow.
+            // A direct POST must never allow a team to enroll itself into a later round.
+            throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
         if (matrix.getSubmissionStartDate() != null && now.isBefore(matrix.getSubmissionStartDate())) {
@@ -134,13 +123,20 @@ public class SubmissionService {
     public SubmissionResponse updateSubmission(Long id, SubmissionRequest request) {
         Submission submission = submissionRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.SUBMISSION_NOT_FOUND));
-        TrackRoundMatrix matrix = matrixRepository.findById(request.getMatrixId())
-                .orElseThrow(() -> new AppException(ErrorCode.MATRIX_NOT_FOUND));
+        TrackRoundMatrix matrix = submission.getMatrix();
+        if (matrix == null || request.getMatrixId() == null || !matrix.getId().equals(request.getMatrixId())) {
+            throw new AppException(ErrorCode.BUSINESS_ERROR);
+        }
 
         if (submission.getTeam() == null || !submission.getTeam().getId().equals(request.getTeamId())) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
         requireTeamLeader(submission.getTeam().getId());
+        requireSameEvent(submission.getTeam(), matrix);
+
+        if (Boolean.TRUE.equals(matrix.getIsPublished())) {
+            throw new AppException(ErrorCode.BUSINESS_ERROR);
+        }
 
         if ("APPROVED".equals(submission.getTeam().getDisqualificationStatus())) {
             throw new RuntimeException("Đội thi đã bị loại và không thể cập nhật bài nộp");
@@ -182,13 +178,11 @@ public class SubmissionService {
             throw new AppException(ErrorCode.SUBMISSION_DEADLINE_PASSED);
         }
 
-        // Clear all previous judge scores when team leader resubmits
         List<com.backend.entity.Score> oldScores = scoreRepository.findBySubmissionId(submission.getId());
         if (oldScores != null && !oldScores.isEmpty()) {
-            scoreRepository.deleteAll(oldScores);
+            throw new AppException(ErrorCode.BUSINESS_ERROR);
         }
 
-        submission.setMatrix(matrix);
         submission.setFileUrl(request.getFileUrl());
         submission.setSubmissionDataJson(request.getSubmissionDataJson());
         submission.setIsGraded(false);
@@ -233,6 +227,15 @@ public class SubmissionService {
         }
     }
 
+    private void requireSameEvent(Team team, TrackRoundMatrix matrix) {
+        Long teamEventId = team.getEvent() == null ? null : team.getEvent().getId();
+        Long matrixEventId = matrix.getRound() == null || matrix.getRound().getEvent() == null
+                ? null : matrix.getRound().getEvent().getId();
+        if (teamEventId == null || !teamEventId.equals(matrixEventId)) {
+            throw new AppException(ErrorCode.BUSINESS_ERROR);
+        }
+    }
+
     private SubmissionResponse toSubmissionResponse(Submission submission) {
         TrackRoundMatrix matrix = submission.getMatrix();
         Team team = submission.getTeam();
@@ -251,13 +254,13 @@ public class SubmissionService {
                 User currentUser = currentUserOpt.get();
                 
                 // 1. If current user is a participant (USER role), apply results publication check
-                if (currentUser.getRole() == RoleType.USER) {
-                    boolean resultsPublished = matrix != null 
-                            && matrix.getRound() != null 
-                            && matrix.getRound().getEvent() != null 
-                            && Boolean.TRUE.equals(matrix.getRound().getEvent().getResultsPublished());
-                    
-                    if (!resultsPublished) {
+                boolean assignedJudge = matrix != null && matrix.getJudges() != null
+                        && matrix.getJudges().stream().anyMatch(judge -> judge.getId().equals(currentUser.getId()));
+
+                if (currentUser.getRole() == RoleType.USER
+                        || ((currentUser.getRole() == RoleType.STAFF
+                        || currentUser.getRole() == RoleType.MENTOR) && !assignedJudge)) {
+                    if (matrix == null || !Boolean.TRUE.equals(matrix.getIsPublished())) {
                         scoreVal = null;
                         criteriaScores = null;
                         feedbackVal = null;
@@ -265,8 +268,7 @@ public class SubmissionService {
                     }
                 } 
                 // 2. If the current user is assigned as a judge, return their personal grading state.
-                else if (matrix != null && matrix.getJudges() != null
-                        && matrix.getJudges().stream().anyMatch(judge -> judge.getId().equals(currentUser.getId()))) {
+                else if (assignedJudge) {
                     Score personalScore = scoreRepository.findBySubmissionIdAndJudgeId(submission.getId(), currentUser.getId()).orElse(null);
                     if (personalScore != null) {
                         isGradedVal = true;
