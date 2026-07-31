@@ -66,11 +66,33 @@ public class UserController {
     @GetMapping("/me/assignments")
     public ResponseEntity<Map<String, Object>> getMyAssignments() {
         User user = getAuthenticatedUser();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+        List<com.backend.entity.TrackRoundMatrix> activeMentorMatrices = matrixRepository.findDistinctByMentorsId(user.getId()).stream()
+                .filter(m -> m.getRound() != null && m.getRound().getEvent() != null)
+                .filter(m -> {
+                    com.backend.entity.HackathonEvent e = m.getRound().getEvent();
+                    boolean endedEarly = Boolean.TRUE.equals(e.getEndedEarly());
+                    boolean timeExpired = e.getEventEndDate() != null && now.isAfter(e.getEventEndDate());
+                    return !endedEarly && !timeExpired;
+                })
+                .toList();
+
+        List<com.backend.entity.TrackRoundMatrix> activeJudgeMatrices = matrixRepository.findDistinctByJudgesId(user.getId()).stream()
+                .filter(m -> m.getRound() != null && m.getRound().getEvent() != null)
+                .filter(m -> {
+                    com.backend.entity.HackathonEvent e = m.getRound().getEvent();
+                    boolean endedEarly = Boolean.TRUE.equals(e.getEndedEarly());
+                    boolean timeExpired = e.getEventEndDate() != null && now.isAfter(e.getEventEndDate());
+                    return !endedEarly && !timeExpired;
+                })
+                .toList();
+
         Map<String, Object> assignments = new HashMap<>();
-        assignments.put("mentor", !matrixRepository.findDistinctByMentorsId(user.getId()).isEmpty());
-        assignments.put("judge", !matrixRepository.findDistinctByJudgesId(user.getId()).isEmpty());
-        assignments.put("mentorMatrixIds", matrixRepository.findDistinctByMentorsId(user.getId()).stream().map(matrix -> matrix.getId()).toList());
-        assignments.put("judgeMatrixIds", matrixRepository.findDistinctByJudgesId(user.getId()).stream().map(matrix -> matrix.getId()).toList());
+        assignments.put("mentor", !activeMentorMatrices.isEmpty());
+        assignments.put("judge", !activeJudgeMatrices.isEmpty());
+        assignments.put("mentorMatrixIds", activeMentorMatrices.stream().map(m -> m.getId()).toList());
+        assignments.put("judgeMatrixIds", activeJudgeMatrices.stream().map(m -> m.getId()).toList());
         Map<String, Object> response = new HashMap<>();
         response.put("result", assignments);
         return ResponseEntity.ok(response);
