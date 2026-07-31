@@ -22,6 +22,7 @@ public class StatsController {
     private final TeamRepository teamRepository;
     private final SubmissionRepository submissionRepository;
     private final com.backend.repository.ScoreRepository scoreRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @GetMapping
     public ApiResponse<DashboardStatsResponse> getDashboardStats() {
@@ -38,6 +39,65 @@ public class StatsController {
 
         return ApiResponse.<DashboardStatsResponse>builder()
                 .result(stats)
+                .build();
+    }
+
+    @GetMapping("/demographics")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('COORDINATOR') or hasRole('ADMIN')")
+    public ApiResponse<java.util.Map<String, Object>> getDemographicsStats() {
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        
+        // 1. Participant count by university
+        List<java.util.Map<String, Object>> universities = jdbcTemplate.queryForList("""
+            SELECT COALESCE(university_name, 'Unknown') AS name, COUNT(*) AS count
+            FROM users
+            WHERE role = 'USER'
+            GROUP BY university_name
+            ORDER BY count DESC
+            """);
+        data.put("universities", universities);
+        
+        // 2. Participant count by event/season
+        List<java.util.Map<String, Object>> events = jdbcTemplate.queryForList("""
+            SELECT e.name AS name, COUNT(DISTINCT tm.user_id) AS count
+            FROM team_members tm
+            JOIN teams t ON tm.team_id = t.id
+            JOIN events e ON t.event_id = e.id
+            GROUP BY e.name
+            ORDER BY count DESC
+            """);
+        data.put("events", events);
+        
+        // 3. FPT vs Non-FPT students count
+        List<java.util.Map<String, Object>> fptStats = jdbcTemplate.queryForList("""
+            SELECT is_fpt_student AS isFpt, COUNT(*) AS count
+            FROM users
+            WHERE role = 'USER'
+            GROUP BY is_fpt_student
+            """);
+        data.put("fptStats", fptStats);
+
+        // 4. Verification/Approval status count
+        List<java.util.Map<String, Object>> statusStats = jdbcTemplate.queryForList("""
+            SELECT status AS status, COUNT(*) AS count
+            FROM users
+            WHERE role = 'USER'
+            GROUP BY status
+            """);
+        data.put("statusStats", statusStats);
+
+        // 5. Teams count per event
+        List<java.util.Map<String, Object>> eventTeams = jdbcTemplate.queryForList("""
+            SELECT e.name AS name, COUNT(*) AS count
+            FROM teams t
+            JOIN events e ON t.event_id = e.id
+            GROUP BY e.name
+            ORDER BY count DESC
+            """);
+        data.put("eventTeams", eventTeams);
+
+        return ApiResponse.<java.util.Map<String, Object>>builder()
+                .result(data)
                 .build();
     }
 
