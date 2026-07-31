@@ -16,5 +16,6 @@ import lombok.NoArgsConstructor;
 public class PublicStaffResponse {
     private Long id;       // userId - used by frontend to filter submissions by assigned judge
     private String fullName;
+    private String email;
     private String avatarUrl;
 }

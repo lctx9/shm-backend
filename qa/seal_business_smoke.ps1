@@ -94,7 +94,9 @@ function Login-Seal {
 function Remove-TestRows {
     param([long]$SubmissionId, [long]$TeamId)
 
-    $propertiesPath = 'D:\seal\shm-backend\src\main\resources\application.properties'
+    $baseDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+    $propertiesPath = Join-Path $baseDir '..\src\main\resources\application.properties'
+    if (-not (Test-Path $propertiesPath)) { $propertiesPath = Join-Path $baseDir 'src\main\resources\application.properties' }
     $passwordLine = Get-Content -LiteralPath $propertiesPath |
         Where-Object { $_ -like 'spring.datasource.password=*' } |
         Select-Object -First 1
@@ -358,7 +360,8 @@ finally {
     }
 
     if ($cleanup.backupFile) {
-        $backupDirectory = [System.IO.Path]::GetFullPath('D:\seal\shm-backend\backups')
+        $baseDirForBackup = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+        $backupDirectory = [System.IO.Path]::GetFullPath((Join-Path $baseDirForBackup '..\backups'))
         $backupPath = [System.IO.Path]::GetFullPath((Join-Path $backupDirectory $cleanup.backupFile))
         if ($backupPath.StartsWith($backupDirectory, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $backupPath)) {
             Remove-Item -LiteralPath $backupPath -Force
@@ -440,7 +443,7 @@ try {
 
     # ── Tạo tài khoản nhân sự ─────────────────────────────
     $rJudge = Invoke-SealApi -Method POST -Path '/users/staff' -Body @{
-        fullName='E2E Judge'; email=$p2Cleanup.judgeEmail; password='Judge@1234'; role='JUDGE'
+        fullName='E2E Judge'; email=$p2Cleanup.judgeEmail; password='Judge@1234'; role='STAFF'
     } -Token $coord.token
     Add-Result '[E2E] Tạo tài khoản JUDGE' ($rJudge.Status -eq 200) "HTTP $($rJudge.Status)"
 
