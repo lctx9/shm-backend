@@ -146,10 +146,10 @@ INSERT INTO track_round_matrix (
     ]$$);
 
 INSERT INTO matrix_mentors (matrix_id, mentor_id) VALUES
-    (1, 5), (2, 5), (3, 6), (4, 6);
+    (1, 5), (2, 5), (3, 6), (3, 3), (4, 6), (4, 3);
 
 INSERT INTO matrix_judges (matrix_id, judge_id) VALUES
-    (1, 3), (1, 4), (2, 3), (2, 4), (3, 3), (3, 4), (4, 3), (4, 4);
+    (1, 3), (1, 4), (2, 3), (2, 4), (3, 4), (4, 4);
 
 INSERT INTO teams (
     id, created_at, updated_at, name, description, type, join_password,
