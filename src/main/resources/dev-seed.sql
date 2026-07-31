@@ -60,170 +60,147 @@ INSERT INTO users (
     (16, now(), now(), 'Student Join Request', 'join.request@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170088', true, 'Đại học FPT', null, 'https://placehold.co/900x560/eaf3ff/0f63c9?text=Student+Card+Join', null, 'USER', 'APPROVED'),
     (17, now(), now(), 'Pending Upload Student', 'pending.upload@seal.dev', '$2a$10$dpnye/kA4TseeECTdSRL9uAU57uNSgNNWi6z1FqnljJ/yV9djXtHa', 'SE170100', true, 'Đại học FPT', null, 'https://placehold.co/900x560/fef3c7/92400e?text=Pending+Student+Card', null, 'USER', 'PENDING');
 
+-- EVENTS
 INSERT INTO events (
     id, created_at, updated_at, name, season, year, reg_start_date, reg_end_date,
     event_start_date, event_end_date, default_submission_deadline, round_count,
     structure_initialized, submission_form_schema, competition_rules,
     rule_document_url, is_active, results_published
-) VALUES (
+) VALUES
+(
     1, now(), now(), 'SEAL Hackathon Spring 2026', 'SPRING', 2026,
     '2026-07-01 08:00:00', '2026-08-30 23:59:00',
     '2026-07-21 08:00:00', '2026-09-30 18:00:00',
     '2026-07-21 23:59:00', 2, true,
-    $$[
-      {"id":"projectName","label":"Ten du an","type":"text","required":true},
-      {"id":"problemStatement","label":"Van de can giai quyet","type":"textarea","required":true},
-      {"id":"repoUrl","label":"Link source code","type":"url","required":true},
-      {"id":"demoUrl","label":"Link demo","type":"url","required":false},
-      {"id":"pitchDeck","label":"Pitch deck","type":"url","required":true}
-    ]$$,
-    $$1. Moi doi co 2-5 thanh vien.
-2. San pham phai duoc phat trien trong khuon kho su kien.
-3. Bai nop tre deadline se bi danh dau va can coordinator xem xet.
-4. Judge cham diem theo rubric cong khai cua tung round.
-5. Moi lan sua diem phai co ly do de luu audit log.$$,
+    $$[{"id":"projectName","label":"Ten du an","type":"text","required":true}]$$,
+    $$1. Moi doi co 2-5 thanh vien.$$,
     'https://example.com/seal/rules-spring-2026.pdf',
-    true,
-    false
+    true, false
 ),
 (
     2, now(), now(), 'SEAL Hackathon Fall 2025', 'FALL', 2025,
     '2025-09-01 08:00:00', '2025-09-15 23:59:00',
     '2025-09-20 08:00:00', '2025-09-28 18:00:00',
     '2025-09-26 23:59:00', 2, true,
-    $$[
-      {"id":"projectName","label":"Ten du an","type":"text","required":true},
-      {"id":"repoUrl","label":"Link source code","type":"url","required":true},
-      {"id":"demoUrl","label":"Link demo","type":"url","required":true}
-    ]$$,
-    $$1. Moi doi co 2-5 thanh vien.
-2. San pham can co demo hoat dong.
-3. Ket qua duoc cong bo sau vong final pitch.$$,
+    $$[{"id":"projectName","label":"Ten du an","type":"text","required":true}]$$,
+    $$1. Moi doi co 2-5 thanh vien.$$,
     'https://example.com/seal/rules-fall-2025.pdf',
-    false,
-    true
+    false, true
+),
+(
+    3, now(), now(), 'Green Tech Hackathon 2024', 'SPRING', 2024,
+    '2024-03-01 08:00:00', '2024-03-15 23:59:00',
+    '2024-03-20 08:00:00', '2024-03-28 18:00:00',
+    '2024-03-26 23:59:00', 2, true,
+    $$[{"id":"projectName","label":"Ten du an","type":"text","required":true}]$$,
+    $$1. Moi doi co 2-5 thanh vien.$$,
+    'https://example.com/seal/rules-green-2024.pdf',
+    false, true
 );
 
+-- TRACKS
 INSERT INTO tracks (id, created_at, updated_at, name, description, event_id, max_teams) VALUES
     (1, now(), now(), 'Software Engineering', 'Web, mobile, backend, platform and productivity tools', 1, NULL),
-    (2, now(), now(), 'AI Application', 'AI-powered products, data apps and automation workflows', 1, NULL);
+    (2, now(), now(), 'AI Application', 'AI-powered products, data apps and automation workflows', 1, NULL),
+    (3, now(), now(), 'AI & ML Track 2025', 'Bảng Trí Tuệ Nhân Tạo 2025', 2, NULL),
+    (4, now(), now(), 'Green Tech Track 2024', 'Bảng Năng Lượng Xanh 2024', 3, NULL);
 
+-- ROUNDS
 INSERT INTO rounds (id, created_at, updated_at, name, order_index, event_id) VALUES
     (1, now(), now(), 'Round 1 - Prototype', 1, 1),
-    (2, now(), now(), 'Round 2 - Final Pitch', 2, 1);
+    (2, now(), now(), 'Round 2 - Final Pitch', 2, 1),
+    (3, now(), now(), 'Vòng Sơ Loại 2025', 1, 2),
+    (4, now(), now(), 'Vòng Chung Kết Fall 2025', 2, 2),
+    (5, now(), now(), 'Vòng Sơ Loại 2024', 1, 3),
+    (6, now(), now(), 'Vòng Chung Kết GreenTech 2024', 2, 3);
 
+-- TRACK ROUND MATRIX
 INSERT INTO track_round_matrix (
     id, created_at, updated_at, track_id, round_id, guideline_url,
-    submission_start_date, submission_deadline, topn, scoring_criteria_json
+    submission_start_date, submission_deadline, topn, is_published, scoring_criteria_json
 ) VALUES
-    (1, now(), now(), 1, 1, 'https://example.com/guidelines/se-r1.pdf', '2026-07-01 08:00:00', '2026-07-21 23:59:00', 1,
-    $$[
-      {"id":"problem_fit","label":"Problem fit","description":"Muc do hieu bai toan va dung nhu cau nguoi dung","maxScore":100,"weight":25},
-      {"id":"technical","label":"Ky thuat","description":"Kien truc, code quality, kha nang van hanh","maxScore":100,"weight":35},
-      {"id":"prototype","label":"Prototype","description":"Do hoan thien cua ban demo","maxScore":100,"weight":25},
-      {"id":"presentation","label":"Presentation","description":"Trinh bay ro rang va tra loi cau hoi","maxScore":100,"weight":15}
-    ]$$),
-    (2, now(), now(), 1, 2, 'https://example.com/guidelines/se-r2.pdf', '2026-07-22 08:00:00', '2026-07-28 23:59:00', 1,
-    $$[
-      {"id":"presentation","label":"Presentation","description":"Storytelling, slide, Q&A","maxScore":100,"weight":30},
-      {"id":"innovation","label":"Tinh sang tao","description":"Cach tiep can moi va khac biet","maxScore":100,"weight":20},
-      {"id":"technical","label":"Ky thuat","description":"Tinh on dinh, bao mat, kha nang mo rong","maxScore":100,"weight":30},
-      {"id":"impact","label":"Tinh ung dung","description":"Gia tri thuc te va kha nang trien khai","maxScore":100,"weight":20}
-    ]$$),
-    (3, now(), now(), 2, 1, 'https://example.com/guidelines/ai-r1.pdf', '2026-07-01 08:00:00', '2026-07-21 23:59:00', 1,
-    $$[
-      {"id":"data","label":"Du lieu","description":"Chat luong du lieu va cach xu ly","maxScore":100,"weight":25},
-      {"id":"model","label":"Model","description":"Lua chon mo hinh, prompt, evaluation","maxScore":100,"weight":35},
-      {"id":"product","label":"San pham","description":"Trai nghiem nguoi dung va tinh hoan thien","maxScore":100,"weight":25},
-      {"id":"presentation","label":"Presentation","description":"Trinh bay va Q&A","maxScore":100,"weight":15}
-    ]$$),
-    (4, now(), now(), 2, 2, 'https://example.com/guidelines/ai-r2.pdf', '2026-07-22 08:00:00', '2026-07-28 23:59:00', 1,
-    $$[
-      {"id":"presentation","label":"Presentation","description":"Storytelling, demo flow, Q&A","maxScore":100,"weight":25},
-      {"id":"innovation","label":"Tinh sang tao","description":"Muc do moi cua ung dung AI","maxScore":100,"weight":25},
-      {"id":"model_quality","label":"Chat luong AI","description":"Do chinh xac, an toan, kha nang giai thich","maxScore":100,"weight":30},
-      {"id":"business","label":"Tinh ung dung","description":"Gia tri, thi truong, kha nang mo rong","maxScore":100,"weight":20}
-    ]$$);
+    (1, now(), now(), 1, 1, 'https://example.com/guidelines/se-r1.pdf', '2026-07-01 08:00:00', '2026-07-21 23:59:00', 1, true, $$[]$$),
+    (2, now(), now(), 1, 2, 'https://example.com/guidelines/se-r2.pdf', '2026-07-22 08:00:00', '2026-07-28 23:59:00', 1, false, $$[]$$),
+    (3, now(), now(), 2, 1, 'https://example.com/guidelines/ai-r1.pdf', '2026-07-01 08:00:00', '2026-07-21 23:59:00', 1, true, $$[]$$),
+    (4, now(), now(), 2, 2, 'https://example.com/guidelines/ai-r2.pdf', '2026-07-22 08:00:00', '2026-07-28 23:59:00', 1, false, $$[]$$),
+    (5, now(), now(), 3, 4, 'https://example.com/guidelines/fall-final.pdf', '2025-09-20 08:00:00', '2025-09-26 23:59:00', 1, true, $$[]$$),
+    (6, now(), now(), 4, 6, 'https://example.com/guidelines/green-final.pdf', '2024-03-20 08:00:00', '2024-03-26 23:59:00', 1, true, $$[]$$);
 
-INSERT INTO matrix_mentors (matrix_id, mentor_id) VALUES
-    (1, 5), (2, 5), (3, 6), (4, 6);
+INSERT INTO matrix_mentors (matrix_id, mentor_id) VALUES (1, 5), (2, 5), (3, 6), (4, 6);
+INSERT INTO matrix_judges (matrix_id, judge_id) VALUES (1, 3), (1, 4), (2, 3), (2, 4), (3, 3), (3, 4), (4, 3), (4, 4);
 
-INSERT INTO matrix_judges (matrix_id, judge_id) VALUES
-    (1, 3), (1, 4), (2, 3), (2, 4), (3, 3), (3, 4), (4, 3), (4, 4);
-
+-- TEAMS
 INSERT INTO teams (
     id, created_at, updated_at, name, description, type, join_password,
-    track_id, event_id
+    disqualification_status, disqualification_reason, disqualifier_email,
+    rejection_reason, event_id, track_id
 ) VALUES
-    (1, now(), now(), 'Alpha Builders', 'Builds a collaborative project planning tool for student teams.', 'PUBLIC', null, 1, 1),
-    (2, now(), now(), 'Beta Vision', 'Creates an AI assistant for summarizing lectures and extracting action items.', 'PRIVATE', 'beta2026', 2, 1),
-    (3, now(), now(), 'Gamma Flow', 'Designs an internal event operations dashboard with checklist automation.', 'PUBLIC', null, 1, 1),
-    (4, now(), now(), 'Delta Mind', 'Builds an AI mentor assistant that reviews pitch decks and suggests improvements.', 'PRIVATE', 'delta2026', 2, 1);
+    (1, now(), now(), 'Alpha Builders', 'Nen tang quan ly du an hackathon', 'PUBLIC', '123456', 'NOT_DISQUALIFIED', null, null, null, 1, 1),
+    (2, now(), now(), 'Beta Vision', 'Tro ly AI ho tro giam khảo', 'PUBLIC', '123456', 'NOT_DISQUALIFIED', null, null, null, 1, 2),
+    (3, now(), now(), 'Gamma Flow', 'San gia dich vu mentor', 'PUBLIC', '123456', 'NOT_DISQUALIFIED', null, null, null, 1, 1),
+    (4, now(), now(), 'Delta Mind', 'He thong tu dong phan tich code', 'PUBLIC', '123456', 'NOT_DISQUALIFIED', null, null, null, 1, 2);
 
+-- TEAM MEMBERS
 INSERT INTO team_members (id, created_at, updated_at, team_id, user_id, role) VALUES
-    (1, now(), now(), 1, 7, 'LEADER'),
-    (2, now(), now(), 1, 8, 'MEMBER'),
-    (3, now(), now(), 1, 18, 'MEMBER'),
+    (1, now(), now(), 1, 7, 'LEADER'), (2, now(), now(), 1, 8, 'MEMBER'), (11, now(), now(), 1, 18, 'MEMBER'),
+    (3, now(), now(), 2, 9, 'LEADER'), (4, now(), now(), 2, 10, 'MEMBER'), (12, now(), now(), 2, 19, 'MEMBER'),
+    (5, now(), now(), 3, 12, 'LEADER'), (6, now(), now(), 3, 13, 'MEMBER'), (13, now(), now(), 3, 20, 'MEMBER'),
+    (7, now(), now(), 4, 14, 'LEADER'), (8, now(), now(), 4, 15, 'MEMBER'), (14, now(), now(), 4, 21, 'MEMBER');
 
-    (4, now(), now(), 2, 9, 'LEADER'),
-    (5, now(), now(), 2, 10, 'MEMBER'),
-    (6, now(), now(), 2, 19, 'MEMBER'),
+-- PRIZES
+INSERT INTO prizes (id, created_at, updated_at, name, description, event_id, team_id) VALUES
+    -- Event 1 Prizes (Spring 2026)
+    (1, now(), now(), '🏆 Giải Nhất - Quán Quân Spring 2026', '50.000.000 VNĐ + Cúp Vàng', 1, 2),
+    (2, now(), now(), '🥈 Giải Nhì - Á Quân Spring 2026', '30.000.000 VNĐ + Huy Chương Bạc', 1, 1),
+    (3, now(), now(), '🥉 Giải Ba - Hạng Ba Spring 2026', '15.000.000 VNĐ + Huy Chương Đồng', 1, 3),
 
-    (7, now(), now(), 3, 12, 'LEADER'),
-    (8, now(), now(), 3, 13, 'MEMBER'),
-    (9, now(), now(), 3, 20, 'MEMBER'),
+    -- Event 2 Prizes (Fall 2025)
+    (4, now(), now(), '🏆 Giải Nhất - Quán Quân AI Fall 2025', '40.000.000 VNĐ + Cúp Vàng', 2, 1),
+    (5, now(), now(), '🥈 Giải Nhì - Á Quân AI Fall 2025', '20.000.000 VNĐ + Huy Chương Bạc', 2, 2),
+    (6, now(), now(), '🥉 Giải Ba - Hạng Ba AI Fall 2025', '10.000.000 VNĐ + Huy Chương Đồng', 2, 3),
 
-    (10, now(), now(), 4, 14, 'LEADER'),
-    (11, now(), now(), 4, 15, 'MEMBER'),
-    (12, now(), now(), 4, 21, 'MEMBER');
+    -- Event 3 Prizes (Green Tech 2024 - 3 configured prizes, but only 2 teams competed!)
+    (7, now(), now(), '🏆 Giải Nhất - Quán Quân GreenTech 2024', '35.000.000 VNĐ + Cúp Vàng', 3, 4),
+    (8, now(), now(), '🥈 Giải Nhì - Á Quân GreenTech 2024', '18.000.000 VNĐ + Huy Chương Bạc', 3, 1),
+    (9, now(), now(), '🥉 Giải Ba - Khuyến Khích GreenTech 2024', '8.000.000 VNĐ + Huy Chương Đồng', 3, null);
 
-INSERT INTO team_join_requests (id, created_at, updated_at, team_id, user_id, status) VALUES
-    (1, now(), now(), 1, 16, 'PENDING');
-
+-- SUBMISSIONS
 INSERT INTO submissions (
     id, created_at, updated_at, team_id, matrix_id, file_url, is_flagged,
     flag_reason, score, feedback, criteria_scores_json, is_graded
 ) VALUES
-    (1, now(), now(), 1, 1, 'https://github.com/seal-demo/alpha-builders/releases/tag/r1', false, null, 84.5,
-     'Prototype tot, can lam ro hon phan scale va monitoring.',
-     $$[
-       {"id":"problem_fit","label":"Problem fit","maxScore":100,"weight":25,"score":86,"note":"Dung pain point cua doi thi."},
-       {"id":"technical","label":"Ky thuat","maxScore":100,"weight":35,"score":82,"note":"Kien truc on, can test them."},
-       {"id":"prototype","label":"Prototype","maxScore":100,"weight":25,"score":88,"note":"Demo chay tot."},
-       {"id":"presentation","label":"Presentation","maxScore":100,"weight":15,"score":82,"note":"Trinh bay gon."}
-     ]$$, true),
-    (2, now(), now(), 2, 3, 'https://github.com/seal-demo/beta-vision/releases/tag/r1', false, null, null, null, null, false),
-    (3, now(), now(), 3, 1, 'https://github.com/seal-demo/gamma-flow/releases/tag/r1', false, null, null, null, null, false),
-    (4, now(), now(), 4, 3, 'https://github.com/seal-demo/delta-mind/releases/tag/r1', false, null, null, null, null, false);
+    -- Event 1 Final Round (Matrix 2 & 4) - Ready for Coordinator to Publish!
+    (101, now(), now(), 2, 4, 'https://github.com/seal-demo/beta-vision/final-demo', false, null, 95.5, 'Giải pháp AI vượt trội, ứng dụng cao', $$[]$$, true),
+    (102, now(), now(), 1, 2, 'https://github.com/seal-demo/alpha-builders/final-demo', false, null, 89.0, 'Prototype hoàn thiện, giao diện mượt', $$[]$$, true),
+    (103, now(), now(), 3, 2, 'https://github.com/seal-demo/gamma-flow/final-demo', false, null, 83.5, 'Ý tưởng sáng tạo, pitching ấn tượng', $$[]$$, true),
 
+    -- Event 2 Final Round (Matrix 5) - Already Published!
+    (201, now(), now(), 1, 5, 'https://github.com/seal-demo/alpha-ai-2025', false, null, 97.0, 'Mô hình AI xuất sắc nhất mùa giải 2025', $$[]$$, true),
+    (202, now(), now(), 2, 5, 'https://github.com/seal-demo/beta-ai-2025', false, null, 91.5, 'Ý tưởng thực tiễn cao', $$[]$$, true),
+    (203, now(), now(), 3, 5, 'https://github.com/seal-demo/gamma-ai-2025', false, null, 86.0, 'Tiềm năng phát triển lớn', $$[]$$, true),
+
+    -- Event 3 Final Round (Matrix 6) - 2 Teams, 3 Configured Prizes!
+    (301, now(), now(), 4, 6, 'https://github.com/seal-demo/delta-green-2024', false, null, 94.0, 'Giải pháp năng lượng thông minh tiêu biểu', $$[]$$, true),
+    (302, now(), now(), 1, 6, 'https://github.com/seal-demo/alpha-green-2024', false, null, 88.5, 'Ứng dụng thực tế cao', $$[]$$, true);
+
+-- SCORES (Giám khảo đã chấm xong 100%)
 INSERT INTO scores (
     id, created_at, updated_at, submission_id, judge_id, score_value,
     criteria_scores_json, comment
 ) VALUES
-    (1, now(), now(), 1, 3, 84.5,
-     $$[
-       {"id":"problem_fit","label":"Problem fit","maxScore":100,"weight":25,"score":86,"note":"Dung pain point cua doi thi."},
-       {"id":"technical","label":"Ky thuat","maxScore":100,"weight":35,"score":82,"note":"Kien truc on, can test them."},
-       {"id":"prototype","label":"Prototype","maxScore":100,"weight":25,"score":88,"note":"Demo chay tot."},
-       {"id":"presentation","label":"Presentation","maxScore":100,"weight":15,"score":82,"note":"Trinh bay gon."}
-     ]$$,
-     'Prototype tot, can lam ro hon phan scale va monitoring.');
+    (1011, now(), now(), 101, 3, 95.5, $$[]$$, 'Giải pháp AI vượt trội, ứng dụng cao'),
+    (1012, now(), now(), 101, 4, 95.5, $$[]$$, 'Chấm điểm cao cho mô hình AI'),
+    (1021, now(), now(), 102, 3, 89.0, $$[]$$, 'Prototype hoàn thiện, giao diện mượt'),
+    (1022, now(), now(), 102, 4, 89.0, $$[]$$, 'Thiết kế hệ thống bài bản'),
+    (1031, now(), now(), 103, 3, 83.5, $$[]$$, 'Ý tưởng sáng tạo, pitching ấn tượng'),
+    (1032, now(), now(), 103, 4, 83.5, $$[]$$, 'Trình bày rõ ràng'),
 
-INSERT INTO prizes (id, created_at, updated_at, name, description, event_id, team_id) VALUES
-    (1, now(), now(), 'First Prize', '10,000,000 VND va goi mentoring 3 thang', 1, 2),
-    (2, now(), now(), 'Innovation Prize', 'Danh cho y tuong sang tao nhat', 1, 1),
-    (3, now(), now(), 'Best Presentation', 'Danh cho phan pitch thuyet phuc nhat', 1, 1);
+    (2011, now(), now(), 201, 3, 97.0, $$[]$$, 'Mô hình AI xuất sắc nhất mùa giải 2025'),
+    (2021, now(), now(), 202, 3, 91.5, $$[]$$, 'Ý tưởng thực tiễn cao'),
+    (2031, now(), now(), 203, 3, 86.0, $$[]$$, 'Tiềm năng phát triển lớn'),
 
-INSERT INTO notifications (
-    id, created_at, updated_at, title, body, target_role, recipient_id, sender_id
-) VALUES
-    (1, now(), now(), 'Mo cong dang ky SEAL Spring 2026', 'Coordinator da mo cong dang ky cho SEAL Hackathon Spring 2026.', 'USER', null, 2),
-    (2, now(), now(), 'Can cham bai Round 1', 'Staff duoc phan cong Judge vui long cham cac bai nop Round 1 truoc deadline.', 'JUDGE', null, 2);
-
-INSERT INTO chat_messages (id, created_at, updated_at, team_id, sender_id, content) VALUES
-    (1, now(), now(), 1, 5, 'Team Alpha, hay them risk log va deployment note vao submission.'),
-    (2, now(), now(), 1, 7, 'Da ro mentor, team se cap nhat trong ban nop tiep theo.'),
-    (3, now(), now(), 2, 6, 'Beta Vision nen them metric danh gia chat luong summary.');
+    (3011, now(), now(), 301, 3, 94.0, $$[]$$, 'Giải pháp năng lượng thông minh tiêu biểu'),
+    (3021, now(), now(), 302, 3, 88.5, $$[]$$, 'Ứng dụng thực tế cao');
 
 SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT max(id) FROM users));
 SELECT setval(pg_get_serial_sequence('events', 'id'), (SELECT max(id) FROM events));
@@ -232,11 +209,8 @@ SELECT setval(pg_get_serial_sequence('rounds', 'id'), (SELECT max(id) FROM round
 SELECT setval(pg_get_serial_sequence('track_round_matrix', 'id'), (SELECT max(id) FROM track_round_matrix));
 SELECT setval(pg_get_serial_sequence('teams', 'id'), (SELECT max(id) FROM teams));
 SELECT setval(pg_get_serial_sequence('team_members', 'id'), (SELECT max(id) FROM team_members));
-SELECT setval(pg_get_serial_sequence('team_join_requests', 'id'), (SELECT max(id) FROM team_join_requests));
 SELECT setval(pg_get_serial_sequence('submissions', 'id'), (SELECT max(id) FROM submissions));
 SELECT setval(pg_get_serial_sequence('scores', 'id'), (SELECT max(id) FROM scores));
 SELECT setval(pg_get_serial_sequence('prizes', 'id'), (SELECT max(id) FROM prizes));
-SELECT setval(pg_get_serial_sequence('notifications', 'id'), (SELECT max(id) FROM notifications));
-SELECT setval(pg_get_serial_sequence('chat_messages', 'id'), (SELECT max(id) FROM chat_messages));
 
 COMMIT;

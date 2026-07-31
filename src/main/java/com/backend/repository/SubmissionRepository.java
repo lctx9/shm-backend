@@ -13,7 +13,7 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     boolean existsByTeamIdAndMatrixId(Long teamId, Long matrixId);
     @org.springframework.data.jpa.repository.Query("SELECT s FROM Submission s WHERE s.isGraded = true " +
             "AND s.matrix.round.event.id = :eventId " +
-            "AND s.matrix.track IS NULL")
+            "AND s.matrix.round.orderIndex = (SELECT MAX(r.orderIndex) FROM Round r WHERE r.event.id = :eventId)")
     List<Submission> findFinalRoundGradedSubmissions(@org.springframework.data.repository.query.Param("eventId") Long eventId);
     
     long countByIsGradedFalse();
