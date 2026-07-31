@@ -160,6 +160,7 @@ public class TeamService {
                 .joinPassword(joinPassword)
                 .event(event)
                 .track(track)
+                .skillsNeeded(request.getSkillsNeeded())
                 .build();
         teamRepository.save(newTeam);
 
@@ -877,6 +878,7 @@ public class TeamService {
                 .disqualificationReason(team.getDisqualificationReason())
                 .disqualifierEmail(team.getDisqualifierEmail())
                 .rejectionReason(team.getRejectionReason())
+                .skillsNeeded(team.getSkillsNeeded())
                 .build();
     }
 
