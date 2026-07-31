@@ -25,6 +25,7 @@ public class RoundAdvancementController {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
     private final ScoreService scoreService;
+    private final HackathonEventRepository eventRepository;
 
     @PostMapping("/{matrixId}/publish-and-advance")
     @PreAuthorize("hasRole('COORDINATOR')")
@@ -164,15 +165,22 @@ public class RoundAdvancementController {
                 ? nextMatrix.getRound().getName()
                 : null;
 
-        if (finalRound && matrix.getJudges() != null) {
-            for (User judge : matrix.getJudges()) {
-                notificationRepository.save(Notification.builder()
-                        .title("🏆 Kết quả & Bảng xếp hạng " + currentRoundName + " đã được công bố!")
-                        .body("Coordinator đã chính thức công bố điểm số và bảng xếp hạng chung cuộc của giải đấu cho " + currentRoundName + ".")
-                        .recipient(judge)
-                        .sender(currentUser)
-                        .actionUrl("/dashboard/grading")
-                        .build());
+        if (finalRound) {
+            HackathonEvent event = matrix.getRound() != null ? matrix.getRound().getEvent() : null;
+            if (event != null) {
+                event.setResultsPublished(true);
+                eventRepository.save(event);
+            }
+            if (matrix.getJudges() != null) {
+                for (User judge : matrix.getJudges()) {
+                    notificationRepository.save(Notification.builder()
+                            .title("🏆 Kết quả & Bảng xếp hạng " + currentRoundName + " đã được công bố!")
+                            .body("Coordinator đã chính thức công bố điểm số và bảng xếp hạng chung cuộc của giải đấu cho " + currentRoundName + ".")
+                            .recipient(judge)
+                            .sender(currentUser)
+                            .actionUrl("/dashboard/grading")
+                            .build());
+                }
             }
         }
 

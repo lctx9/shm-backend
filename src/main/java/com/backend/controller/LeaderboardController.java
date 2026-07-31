@@ -35,6 +35,7 @@ public class LeaderboardController {
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
     private final HackathonEventRepository eventRepository;
+    private final com.backend.repository.TrackRoundMatrixRepository matrixRepository;
 
     @GetMapping
     public ApiResponse<List<LeaderboardResponse>> getLeaderboard(@RequestParam(required = false) Long eventId) {
@@ -51,6 +52,19 @@ public class LeaderboardController {
 
         HackathonEvent event = eventRepository.findById(targetEventId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giải đấu"));
+
+        // Self-heal: If final round matrices are published, automatically publish event results
+        Integer rc = event.getRoundCount();
+        List<com.backend.entity.TrackRoundMatrix> finalMatrices = matrixRepository.findByRoundEventId(targetEventId).stream()
+                .filter(m -> m.getRound() != null && rc != null && rc == m.getRound().getOrderIndex())
+                .toList();
+
+        if (!finalMatrices.isEmpty() && finalMatrices.stream().allMatch(m -> Boolean.TRUE.equals(m.getIsPublished()))) {
+            if (!Boolean.TRUE.equals(event.getResultsPublished())) {
+                event.setResultsPublished(true);
+                eventRepository.save(event);
+            }
+        }
 
         boolean showUnpublished = false;
         org.springframework.security.core.Authentication auth = SecurityContextHolder.getContext().getAuthentication();
