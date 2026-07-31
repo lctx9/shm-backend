@@ -12,5 +12,6 @@ public class TeamCreateRequest {
     private Long trackId; // ID của hạng mục tham gia
     private Long eventId; // ID của giải đấu
     private java.util.List<String> memberEmails; // Danh sách email thành viên được mời
+    private String skillsNeeded; // Comma-separated list of skills needed
 }
 

@@ -31,5 +31,6 @@ public class TeamResponse {
     private String disqualificationReason;
     private String disqualifierEmail;
     private String rejectionReason;
+    private String skillsNeeded;
 }
 
