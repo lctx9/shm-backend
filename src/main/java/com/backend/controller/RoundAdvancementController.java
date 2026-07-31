@@ -147,13 +147,18 @@ public class RoundAdvancementController {
             eventRepository.save(event);
         }
 
-        if (nextMatrix != null) {
+        if (nextMatrix != null && nextMatrix.getRound() != null) {
             java.time.LocalDateTime now = java.time.LocalDateTime.now();
-            nextMatrix.setSubmissionStartDate(now);
             int nextDuration = nextMatrix.getDurationMinutes() != null ? nextMatrix.getDurationMinutes() : 60;
-            nextMatrix.setSubmissionDeadline(now.plusMinutes(nextDuration));
-            nextMatrix.setBreakEndTime(breakEnd);
-            matrixRepository.save(nextMatrix);
+            java.time.LocalDateTime nextDeadline = now.plusMinutes(nextDuration);
+
+            List<TrackRoundMatrix> sameNextRound = matrixRepository.findByRoundId(nextMatrix.getRound().getId());
+            for (TrackRoundMatrix nm : sameNextRound) {
+                nm.setSubmissionStartDate(now);
+                nm.setSubmissionDeadline(nextDeadline);
+                nm.setBreakEndTime(breakEnd);
+                matrixRepository.save(nm);
+            }
         }
 
         Set<Long> promotedTeamIds = new HashSet<>();
