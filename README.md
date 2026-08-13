@@ -1,2 +1,2 @@
 
-🔗 **Frontend Repository:** https://github.com/lctx9/[ten-repo-frontend]
+🔗 **Frontend Repository:** https://github.com/lctx9/shm-backend
